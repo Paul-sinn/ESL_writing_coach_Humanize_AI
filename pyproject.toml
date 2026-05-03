@@ -1,0 +1,21 @@
+[project]
+name = "pj-1"
+version = "0.1.0"
+description = "LangGraph-based AI detector and humanize web app"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "langgraph>=0.2.60",
+    "openai>=1.51.0",
+    "pydantic-settings>=2.6.1",
+    "uvicorn>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.3",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,165 @@
+================================================================================
+  pj-1 리팩토링 변경 내역
+  ESL Academic Writing Coach 전환 (2026-05-02)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+  BACKEND
+────────────────────────────────────────────────────────────────────────────────
+
+[config.py]
+  - 앱 이름: "Humanize AI Detector" → "ESL Academic Writing Coach"
+  - 크레딧 단가 모델 추가:
+      basic_coaching_cost_per_word  = 1 cr/word
+      deep_coaching_cost_per_word   = 2 cr/word
+      full_review_cost_per_word     = 5 cr/word
+  - 플랜별 월 크레딧 한도 추가:
+      starter_monthly_credits       = 20,000
+      student_plus_monthly_credits  = 60,000
+      pro_monthly_credits           = 150,000
+  - 무료 플랜 단어 제한 추가: free_word_limit = 300
+  - 모델 설정: advanced_analysis_model / humanize_model → coach_model / advanced_coach_model
+  - 기존 advanced_credit_cost, humanize_credit_cost 제거
+
+────────────────────────────────────────────────────────────────────────────────
+
+[schemas.py]
+  - 제거: AnalyzeRequest, HumanizeRequest, AnalyzeResponse, HumanizeResponse,
+          SentenceAnalysis, AppliedRequirements
+  - 추가: CoachRequest (text + assignment_type + writing_level + depth)
+  - 추가: FeedbackItem (sentence + issue_type + explanation + suggestion)
+  - 추가: CoachResponse (feedback_items, strengths, overall_summary,
+          integrity_note, disclosure_statement, credits 정보)
+  - 업데이트: BillingStatusResponse — subscription_status에 "starter", "student_plus" 추가
+  - 업데이트: CheckoutRequest — 6개 상품 코드로 확장
+      (starter_monthly, student_plus_monthly, pro_monthly,
+       credit_pack_s, credit_pack_m, credit_pack_l)
+
+────────────────────────────────────────────────────────────────────────────────
+
+[services/coaching.py]  ← 신규 파일
+  - Policy Guard: bypass/cheat 요청 탐지 (정규식 기반), 차단 시 교육적 메시지 반환
+  - Writing Analyzer: LLM으로 AI 패턴/부자연스러운 영어/로봇 문체/개인 목소리 부재/
+    명확성 문제 탐지 → FeedbackItem 형태로 반환
+    이슈 타입: ai_pattern | unnatural_english | robotic_tone |
+               missing_example | clarity_issue
+  - Academic Integrity: 학교 AI 정책 안내 + Disclosure Statement 생성 (정적)
+  - Fallback: OpenAI API 없이도 키워드 기반 휴리스틱으로 동작
+  - OpenAI chat.completions.create() + response_format json_object 사용
+
+────────────────────────────────────────────────────────────────────────────────
+
+[services/billing.py]
+  - 요금제 6개로 확장:
+      Starter        $7/mo   → 20,000 cr
+      Student Plus  $12/mo   → 60,000 cr  (Most popular)
+      Pro           $19/mo   → 150,000 cr
+      Credit Pack S  $5      → 25,000 cr
+      Credit Pack M $10      → 60,000 cr
+      Credit Pack L $20      → 150,000 cr
+  - 데모 계정 4개로 확장:
+      demo-free     free,          0 cr
+      demo-starter  starter,   20,000 cr
+      demo-plus     student_plus, 60,000 cr
+      demo-pro      pro,      150,000 cr
+  - 업셀 메시지 업데이트: free 유저 → "Student Plus" 권유
+  - 기존 $10/mo Pro 단일 요금제 제거
+
+────────────────────────────────────────────────────────────────────────────────
+
+[graphs.py]
+  - 제거: analysis_graph, humanize_graph, AnalysisState, HumanizeState,
+          verdict_from_score 및 관련 노드 함수 전체
+  - 추가: CoachState TypedDict
+  - 추가: coach_graph (5단계 파이프라인)
+
+      load_user_context
+        → validate_coach_input       (무료 단어 초과 시 billing redirect)
+        → resolve_coach_cost         (depth에 따라 cr/word 계산)
+        → check_coach_entitlement    (free: rate limit / paid: credit check)
+        → run_policy_guard           (bypass 요청 차단)
+        → run_coaching_analysis      (LLM 코칭 분석)
+        → run_academic_integrity     (integrity note + disclosure)
+        → deduct_coach_credits       (free 플랜은 차감 없음)
+        → format_coach_response
+
+  - 오류 센티널 추가: FREE_WORD_LIMIT, POLICY_BLOCKED
+    (기존: INSUFFICIENT_CREDITS, FREE_LIMIT_REACHED)
+  - billing_graph 유지 (내부 로직 소폭 업데이트)
+
+────────────────────────────────────────────────────────────────────────────────
+
+[main.py]
+  - 제거: POST /api/analyze, POST /api/humanize
+  - 추가: POST /api/coach
+  - 유지: GET /api/billing/status, POST /api/billing/checkout
+  - checkout 허용 product_code 6개로 업데이트
+
+────────────────────────────────────────────────────────────────────────────────
+  TESTS
+────────────────────────────────────────────────────────────────────────────────
+
+[tests/conftest.py]
+  - reset_services fixture에 demo-starter, demo-plus 계정 추가
+  - demo-pro 크레딧: 840 → 150,000 으로 업데이트
+
+[tests/test_graphs.py]
+  - analysis_graph / humanize_graph 테스트 전면 교체 → coach_graph 테스트
+  - 신규 케이스:
+      · 기본 피드백 반환 확인
+      · integrity_note / disclosure_statement 포함 확인
+      · free 플랜 단어 초과 → billing_redirect 반환
+      · 크레딧 부족 처리
+      · 빈 텍스트 → ValueError
+      · Policy Guard 차단 (bypass 요청)
+      · free 일일 한도 초과 (3번째 요청에서 billing_redirect)
+      · 유료 플랜 크레딧 차감 검증
+      · billing_graph free / pro 테스트
+
+[tests/test_billing.py]
+  - demo-pro 크레딧 840 → 150,000 기준으로 수정
+  - demo-plus (student_plus) 상태 검증 테스트 추가
+  - checkout option 개수 3 → 6 으로 수정
+  - build_redirect 메시지에서 "Student Plus" 확인으로 변경
+
+  최종 결과: 50 / 50 passed
+
+────────────────────────────────────────────────────────────────────────────────
+  FRONTEND
+────────────────────────────────────────────────────────────────────────────────
+
+[frontend/src/App.jsx]
+  - 브랜딩: "HumanizeIQ" → "Writing Coach / ESL Academic Writing Assistant"
+  - 제거: mode (basic/advanced) 선택, Requirements 입력란, Humanize 버튼,
+          AI 점수 / verdict / sentence highlight 결과 패널
+  - 추가 입력 옵션:
+      · Assignment Type 드롭다운 (5종)
+      · Writing Level 드롭다운 (3종)
+      · Depth 선택 버튼 (Quick Check / Deep Feedback / Full Review)
+      · 크레딧 예상 비용 실시간 표시
+      · 무료 플랜 단어 제한 경고
+  - 추가 결과 패널:
+      · 이슈 타입별 색상 FeedbackItem 카드
+        (ai_pattern:주황 / unnatural_english:파랑 / robotic_tone:보라 /
+         missing_example:초록 / clarity_issue:회색)
+      · 강점(Strengths) 섹션
+      · Academic Integrity 카드 + Disclosure Statement
+      · 사용 크레딧 / 잔여 크레딧 footer
+  - 프로필 드로어: 크레딧 팩 $5/$10/$20 버튼 추가, 업그레이드 CTA → Student Plus
+  - 요금제 패널: 6개 상품 코드 기준으로 버튼 업데이트
+
+[frontend/src/styles.css]
+  - 신규 CSS 클래스 추가:
+      .coach-selects, .select-group, .select-label, .coach-select
+      .depth-row, .depth-btn, .depth-name, .depth-desc, .depth-cost
+      .cost-estimate, .free-limit-note
+      .feedback-list, .feedback-item, .issue-badge
+      .feedback-quote, .feedback-explanation, .feedback-suggestion
+      .strengths-section, .strengths-label, .strength-chip
+      .integrity-card, .integrity-label, .disclosure-box
+      .credits-footer
+  - 기존 클래스는 모두 유지 (호환성 보존)
+
+================================================================================
+  END OF CHANGE LOG
+================================================================================
