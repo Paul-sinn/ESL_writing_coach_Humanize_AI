@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from .config import get_settings
 from .utils.text import count_words
@@ -81,6 +81,8 @@ class HumanizeRequest(BaseModel):
     text: str = Field(min_length=1)
     tone: Literal["natural_student", "academic", "simple_esl"] = "natural_student"
     strength: Literal["light", "balanced", "strong"] = "balanced"
+    persona: Literal["esl_student", "freshman", "upper_division", "native_speaker"] = "esl_student"
+    coach_feedback: list[dict] | None = None
     preserve_meaning: bool = True
     preserve_citations: bool = False
     preserve_structure: bool = False
@@ -126,3 +128,59 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     checkout_url: str
     message: str
+
+
+# ── Auth schemas ──────────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    nickname: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=8, max_length=72)
+    password_confirm: str
+
+    @field_validator("password_confirm")
+    @classmethod
+    def passwords_match(cls, v: str, info: object) -> str:
+        data = getattr(info, "data", {})
+        if "password" in data and v != data["password"]:
+            raise ValueError("Passwords do not match.")
+        return v
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password:str
+    new_password:str = Field(min_length=8,max_length=72)
+    new_password_confirm:str
+
+    @field_validator("new_password_confirm")
+    @classmethod
+    def passwords_match(cls, v:str, info:object) -> str:
+        data = getattr(info,"data",{})
+        
+        if "new_password" in data and v != data["new_password"]:
+            raise ValueError("Passwords do not match.")
+        return v
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    email: str
+    username: str | None = None
+    nickname: str | None = None
+    plan_name: str
+    credits_remaining: int
+
+
+class UserResponse(BaseModel):
+    email: str
+    username: str | None = None
+    nickname: str | None = None
+    plan_name: str
+    credits_remaining: int
+    subscription_status: str

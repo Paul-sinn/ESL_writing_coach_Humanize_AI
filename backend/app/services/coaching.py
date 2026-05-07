@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from ..config import get_settings
@@ -13,19 +12,19 @@ try:
 except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore[assignment]
 
-BLOCKED_PATTERNS = [
-    r"\bbypass\b",
-    r"\bundetectable\b",
-    r"beat\s+turnitin",
-    r"evade\s+detect",
-    r"fool\s+detect",
-    r"pass\s+ai\s+detect",
-    r"no\s+ai\s+score",
-    r"100%\s+human",
-    r"won'?t\s+be\s+(flagged|detected)",
-    r"cheat(ing)?\s+(detector|turnitin|ai)",
-    r"make\s+it\s+undetect",
-]
+# BLOCKED_PATTERNS = [
+#     r"\bbypass\b",
+#     r"\bundetectable\b",
+#     r"beat\s+turnitin",
+#     r"evade\s+detect",
+#     r"fool\s+detect",
+#     r"pass\s+ai\s+detect",
+#     r"no\s+ai\s+score",
+#     r"100%\s+human",
+#     r"won'?t\s+be\s+(flagged|detected)",
+#     r"cheat(ing)?\s+(detector|turnitin|ai)",
+#     r"make\s+it\s+undetect",
+# ]  # reserved for future chatbot feature
 
 ASSIGNMENT_LABELS: dict[str, str] = {
     "discussion_post": "Discussion Post",
@@ -46,18 +45,8 @@ class CoachingService:
     def __init__(self) -> None:
         self._client = OpenAI(api_key=settings.openai_api_key) if (settings.openai_api_key and OpenAI) else None
 
+    # policy_guard reserved for future chatbot feature
     def policy_guard(self, text: str) -> dict[str, Any]:
-        lowered = text.lower()
-        for pattern in BLOCKED_PATTERNS:
-            if re.search(pattern, lowered):
-                return {
-                    "blocked": True,
-                    "message": (
-                        "This tool helps you improve your own writing — it doesn't bypass AI detectors "
-                        "or guarantee undetectable results. Try describing what you'd like to improve "
-                        "about your essay instead."
-                    ),
-                }
         return {"blocked": False, "message": ""}
 
     def analyze_and_coach(
@@ -121,18 +110,19 @@ class CoachingService:
             "}"
         )
 
-        response = self._client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Please analyze and coach my writing:\n\n{text}"},
-            ],
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or ""
         try:
+            response = self._client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": f"Please analyze and coach my writing:\n\n{text}"},
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=settings.coach_max_tokens,
+            )
+            content = response.choices[0].message.content or ""
             return json.loads(content)
-        except json.JSONDecodeError:
+        except Exception:
             return self._fallback_coaching(text)
 
     def generate_integrity_content(self) -> dict[str, Any]:

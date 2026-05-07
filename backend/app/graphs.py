@@ -35,9 +35,8 @@ class CoachState(TypedDict, total=False):
     subscription_status: str
     credits_remaining: int
     credits_required: int
+    credits_reserved: bool
     selected_model: str
-    policy_blocked: bool
-    policy_message: str
     feedback_items: list[dict]
     strengths: list[str]
     overall_summary: str
@@ -59,6 +58,8 @@ class HumanizeState(TypedDict, total=False):
     text: str
     tone: str
     strength: str
+    persona: str
+    coach_feedback: list[dict] | None
     preserve_meaning: bool
     preserve_citations: bool
     preserve_structure: bool
@@ -66,6 +67,8 @@ class HumanizeState(TypedDict, total=False):
     subscription_status: str
     credits_remaining: int
     credits_required: int
+    credits_reserved: bool
+    analysis_result: dict
     rewritten_text: str
     rewritten_word_count: int
     summary_of_changes: str
@@ -97,6 +100,27 @@ def load_user_context(state: CoachState | HumanizeState) -> dict[str, Any]:
     }
 
 
+def calculate_coach_credits(word_count: int, depth: str) -> int:
+    if depth == "basic":
+        return max(
+            word_count * settings.basic_coaching_cost_per_word,
+            settings.basic_coaching_min_credits,
+        )
+    if depth == "deep":
+        return max(
+            word_count * settings.deep_coaching_cost_per_word,
+            settings.deep_coaching_min_credits,
+        )
+    return max(
+        word_count * settings.full_review_cost_per_word,
+        settings.full_review_min_credits,
+    )
+
+
+def calculate_humanize_credits(word_count: int) -> int:
+    return max(word_count * settings.humanize_cost_per_word, settings.humanize_min_credits)
+
+
 # ── Coach graph nodes ─────────────────────────────────────────────────────────
 
 def validate_coach_input(state: CoachState) -> dict[str, Any]:
@@ -119,18 +143,20 @@ def resolve_coach_cost(state: CoachState) -> dict[str, Any]:
     word_count = state["input_word_count"]
     depth = state.get("depth", "deep")
     if depth == "basic":
-        credits_required = word_count * settings.basic_coaching_cost_per_word
+        credits_required = calculate_coach_credits(word_count, depth)
         model = settings.coach_model
     elif depth == "deep":
-        credits_required = word_count * settings.deep_coaching_cost_per_word
+        credits_required = calculate_coach_credits(word_count, depth)
         model = settings.coach_model
     else:
-        credits_required = word_count * settings.full_review_cost_per_word
+        credits_required = calculate_coach_credits(word_count, depth)
         model = settings.advanced_coach_model
     return {"credits_required": credits_required, "selected_model": model}
 
 
 def check_coach_entitlement(state: CoachState) -> dict[str, Any]:
+    if state.get("credits_reserved"):
+        return {}
     if state.get("subscription_status") == "free":
         decision = rate_limit_service.check_and_record(state.get("client_ip") or "unknown")
         if not decision.allowed:
@@ -146,17 +172,6 @@ def check_coach_entitlement(state: CoachState) -> dict[str, Any]:
             "error": "INSUFFICIENT_CREDITS",
         }
     return {}
-
-
-def run_policy_guard(state: CoachState) -> dict[str, Any]:
-    result = coaching_service.policy_guard(state["text"])
-    if result["blocked"]:
-        return {
-            "policy_blocked": True,
-            "policy_message": result["message"],
-            "error": "POLICY_BLOCKED",
-        }
-    return {"policy_blocked": False}
 
 
 def run_coaching_analysis(state: CoachState) -> dict[str, Any]:
@@ -190,6 +205,8 @@ def run_academic_integrity(state: CoachState) -> dict[str, Any]:
 
 
 def deduct_coach_credits(state: CoachState) -> dict[str, Any]:
+    if state.get("credits_reserved"):
+        return {}
     if state.get("subscription_status") == "free" or state.get("credits_required", 0) <= 0:
         return {}
     account = billing_service.deduct_credits(state["user_id"], state["credits_required"])
@@ -202,7 +219,7 @@ def route_to_billing(state: CoachState) -> dict[str, Any]:
 
 def format_coach_response(state: CoachState) -> dict[str, Any]:
     error = state.get("error")
-    allowed_errors = {"INSUFFICIENT_CREDITS", "FREE_LIMIT_REACHED", "POLICY_BLOCKED", "FREE_WORD_LIMIT"}
+    allowed_errors = {"INSUFFICIENT_CREDITS", "FREE_LIMIT_REACHED", "FREE_WORD_LIMIT"}
     if error and error not in allowed_errors:
         raise ValueError(error)
 
@@ -212,12 +229,10 @@ def format_coach_response(state: CoachState) -> dict[str, Any]:
         summary = f"Free plan supports up to {settings.free_word_limit} words. Upgrade to analyze longer essays."
     elif error == "INSUFFICIENT_CREDITS":
         summary = "You need more credits to use this feature."
-    elif state.get("policy_blocked"):
-        summary = state.get("policy_message", "Please describe what you'd like to improve in your writing.")
     else:
         summary = state.get("overall_summary", "")
 
-    is_blocked = bool(state.get("billing_redirect") or state.get("policy_blocked"))
+    is_blocked = bool(state.get("billing_redirect"))
     feedback_items = [] if is_blocked else [FeedbackItem(**item) for item in state.get("feedback_items", [])]
 
     response = CoachResponse(
@@ -253,10 +268,6 @@ def entitlement_should_continue(state: CoachState) -> str:
     return "continue"
 
 
-def policy_should_continue(state: CoachState) -> str:
-    return "blocked" if state.get("policy_blocked") else "continue"
-
-
 # ── Humanize graph nodes ──────────────────────────────────────────────────────
 
 def validate_humanize_input(state: HumanizeState) -> dict[str, Any]:
@@ -270,10 +281,12 @@ def validate_humanize_input(state: HumanizeState) -> dict[str, Any]:
 
 
 def resolve_humanize_cost(state: HumanizeState) -> dict[str, Any]:
-    return {"credits_required": state["input_word_count"] * settings.humanize_cost_per_word}
+    return {"credits_required": calculate_humanize_credits(state["input_word_count"])}
 
 
 def check_humanize_entitlement(state: HumanizeState) -> dict[str, Any]:
+    if state.get("credits_reserved"):
+        return {}
     has_credits, _ = billing_service.ensure_credits(state["user_id"], state["credits_required"])
     if not has_credits:
         return {
@@ -283,15 +296,40 @@ def check_humanize_entitlement(state: HumanizeState) -> dict[str, Any]:
     return {}
 
 
+def run_humanize_analysis(state: HumanizeState) -> dict[str, Any]:
+    coach_feedback = state.get("coach_feedback")
+    if coach_feedback:
+        patterns = [item["sentence"] for item in coach_feedback
+                    if item.get("issue_type") in ("ai_pattern", "robotic_tone")]
+        targets = [item["sentence"] for item in coach_feedback
+                   if item.get("severity") in ("high", "medium")]
+        tone_issues = [item["explanation"] for item in coach_feedback
+                       if item.get("issue_type") == "robotic_tone"]
+        return {"analysis_result": {
+            "patterns_found": patterns[:5],
+            "rewrite_targets": targets[:5],
+            "tone_issues": tone_issues[:3],
+        }}
+    result = humanize_service.analyze_for_rewrite(
+        state["text"],
+        state.get("tone", "natural_student"),
+        state.get("strength", "balanced"),
+        settings.coach_model,
+    )
+    return {"analysis_result": result}
+
+
 def run_humanize_rewrite(state: HumanizeState) -> dict[str, Any]:
     result = humanize_service.rewrite(
         state["text"],
         tone=state.get("tone", "natural_student"),
         strength=state.get("strength", "balanced"),
+        persona=state.get("persona", "esl_student"),
         preserve_meaning=state.get("preserve_meaning", True),
         preserve_citations=state.get("preserve_citations", False),
         preserve_structure=state.get("preserve_structure", False),
         model=settings.coach_model,
+        analysis=state.get("analysis_result"),
     )
     rewritten = result.get("rewritten_text", state["text"])
     return {
@@ -303,6 +341,8 @@ def run_humanize_rewrite(state: HumanizeState) -> dict[str, Any]:
 
 
 def deduct_humanize_credits(state: HumanizeState) -> dict[str, Any]:
+    if state.get("credits_reserved"):
+        return {}
     account = billing_service.deduct_credits(state["user_id"], state["credits_required"])
     return {"credits_remaining": account.credits_remaining}
 
@@ -376,7 +416,6 @@ def build_coach_graph():
     graph.add_node("validate_coach_input", validate_coach_input)
     graph.add_node("resolve_coach_cost", resolve_coach_cost)
     graph.add_node("check_coach_entitlement", check_coach_entitlement)
-    graph.add_node("run_policy_guard", run_policy_guard)
     graph.add_node("run_coaching_analysis", run_coaching_analysis)
     graph.add_node("run_academic_integrity", run_academic_integrity)
     graph.add_node("deduct_coach_credits", deduct_coach_credits)
@@ -394,12 +433,7 @@ def build_coach_graph():
     graph.add_conditional_edges(
         "check_coach_entitlement",
         entitlement_should_continue,
-        {"continue": "run_policy_guard", "billing": "route_to_billing", "error": "format_coach_response"},
-    )
-    graph.add_conditional_edges(
-        "run_policy_guard",
-        policy_should_continue,
-        {"continue": "run_coaching_analysis", "blocked": "format_coach_response"},
+        {"continue": "run_coaching_analysis", "billing": "route_to_billing", "error": "format_coach_response"},
     )
     graph.add_edge("run_coaching_analysis", "run_academic_integrity")
     graph.add_edge("run_academic_integrity", "deduct_coach_credits")
@@ -415,6 +449,7 @@ def build_humanize_graph():
     graph.add_node("validate_humanize_input", validate_humanize_input)
     graph.add_node("resolve_humanize_cost", resolve_humanize_cost)
     graph.add_node("check_humanize_entitlement", check_humanize_entitlement)
+    graph.add_node("run_humanize_analysis", run_humanize_analysis)
     graph.add_node("run_humanize_rewrite", run_humanize_rewrite)
     graph.add_node("deduct_humanize_credits", deduct_humanize_credits)
     graph.add_node("route_to_billing_humanize", route_to_billing_humanize)
@@ -431,8 +466,9 @@ def build_humanize_graph():
     graph.add_conditional_edges(
         "check_humanize_entitlement",
         humanize_entitlement_should_continue,
-        {"continue": "run_humanize_rewrite", "billing": "route_to_billing_humanize", "error": "format_humanize_response"},
+        {"continue": "run_humanize_analysis", "billing": "route_to_billing_humanize", "error": "format_humanize_response"},
     )
+    graph.add_edge("run_humanize_analysis", "run_humanize_rewrite")
     graph.add_edge("run_humanize_rewrite", "deduct_humanize_credits")
     graph.add_edge("deduct_humanize_credits", "format_humanize_response")
     graph.add_edge("route_to_billing_humanize", "format_humanize_response")

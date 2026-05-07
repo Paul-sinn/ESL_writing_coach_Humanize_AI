@@ -95,6 +95,8 @@ Must include: Terms of Service, Privacy Policy, Academic Integrity Policy, Refun
 ** If I showed my API keys from like terminal log or something you must let me know that i putted api keys and say "remove api keys and renew it" to me
 ** 내가 실수로 apikey를 너한테 보여줬을때 터미널로그나 어떤식으로든 너는 나한테 무조건 알려줘야하고 지우고 다시 발급받으라고 경고해야돼.
 
+**NEVER read, cat, print, or display the contents of `.env`, `.env.*`, or any file containing API keys or secrets. Do not run any command that would output these files. If a task requires knowing env variable names, refer only to `config.py` which lists the variable names without values.**
+
 ---
 
 ## Stack

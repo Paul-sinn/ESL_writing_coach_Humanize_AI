@@ -14,19 +14,36 @@ class Settings(BaseSettings):
     basic_coaching_cost_per_word: int = 1
     deep_coaching_cost_per_word: int = 2
     full_review_cost_per_word: int = 5
+    basic_coaching_min_credits: int = 500
+    deep_coaching_min_credits: int = 1200
+    full_review_min_credits: int = 3000
 
     # Monthly credits per plan
     starter_monthly_credits: int = 20000
     student_plus_monthly_credits: int = 60000
     pro_monthly_credits: int = 150000
 
-    humanize_cost_per_word: int = 3
+    humanize_cost_per_word: int = 5
+    humanize_min_credits: int = 5000
+
+    # Output caps to keep API spend bounded per request
+    coach_max_tokens: int = 1800
+    humanize_analysis_max_tokens: int = 700
+    humanize_rewrite_max_tokens: int = 2800
+    humanize_repair_max_tokens: int = 2800
 
     # Models
     coach_model: str = "gpt-4o"
     advanced_coach_model: str = "gpt-4o"
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/esl_coach",
+        alias="DATABASE_URL",
+    )
+    jwt_secret_key: str = Field(default="change-me-in-production", alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
 
 @lru_cache

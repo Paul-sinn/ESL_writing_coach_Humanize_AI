@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — EssayCoach</title>
+  <style>
+    :root {
+      --bg: #f2d5ce;
+      --panel: rgba(255, 250, 248, 0.88);
+      --border: rgba(36, 62, 115, 0.12);
+      --ink: #1e3259;
+      --muted: #5e7195;
+      --accent: #243e73;
+      --accent-soft: #8bb4d9;
+      font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(138, 180, 216, 0.45), transparent 28%),
+        linear-gradient(180deg, #fcf7f5 0%, #f2d5ce 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    header {
+      background: rgba(255, 250, 248, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .back-link {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    .hero { margin-bottom: 48px; }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent-soft);
+      background: rgba(36, 62, 115, 0.08);
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .updated {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .intro {
+      margin-top: 20px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--muted);
+      padding: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      border-left: 3px solid var(--accent-soft);
+    }
+
+    /* Promise cards */
+    .promise-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 48px;
+    }
+
+    .promise-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .promise-icon {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    .promise-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .promise-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    section { margin-bottom: 40px; }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--accent-soft);
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .row {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .row:last-child { border-bottom: none; }
+
+    .row-label {
+      flex: 0 0 160px;
+      padding: 16px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(36, 62, 115, 0.03);
+      border-right: 1px solid var(--border);
+    }
+
+    .row-value {
+      flex: 1;
+      padding: 16px 20px;
+      font-size: 14px;
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-right: 4px;
+    }
+    .tag-yes { background: rgba(34, 139, 34, 0.1); color: #1a6b1a; }
+    .tag-no  { background: rgba(180, 30, 30, 0.08); color: #a01c1c; }
+
+    .highlight-card {
+      background: rgba(36, 62, 115, 0.05);
+      border: 1px solid rgba(36, 62, 115, 0.15);
+      border-radius: 14px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .highlight-card strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--accent-soft);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="/">EssayCoach</a>
+  <a class="back-link" href="/">← Back to app</a>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="badge">Privacy</div>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: May 2026</p>
+
+    <p class="intro">
+      We built EssayCoach for students who want to write better — not for data collection.
+      Your writing is yours. Here's exactly what we do and don't do with your information.
+    </p>
+  </div>
+
+  <!-- Promise grid -->
+  <div class="promise-grid">
+    <div class="promise-card">
+      <div class="promise-icon">🚫</div>
+      <div class="promise-title">Never sold</div>
+      <div class="promise-desc">Your text and personal data are never sold to third parties.</div>
+    </div>
+    <div class="promise-card">
+      <div class="promise-icon">🤖</div>
+      <div class="promise-title">Not used to train AI</div>
+      <div class="promise-desc">Your writing is never used to train, fine-tune, or improve any AI model.</div>
+    </div>
+    <div class="promise-card">
+      <div class="promise-icon">🗑️</div>
+      <div class="promise-title">Not retained</div>
+      <div class="promise-desc">Submitted text is processed to return results, then discarded. We don't store your essays.</div>
+    </div>
+    <div class="promise-card">
+      <div class="promise-icon">🔒</div>
+      <div class="promise-title">You're in control</div>
+      <div class="promise-desc">You can request deletion of your account and associated data at any time.</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>What We Collect</h2>
+    <div class="card">
+      <div class="row">
+        <div class="row-label">Account info</div>
+        <div class="row-value">Email address, username, and nickname when you register. Used to identify your account and manage your subscription.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Submitted text</div>
+        <div class="row-value">Text you paste into EssayCoach is sent to our servers and to OpenAI's API to generate feedback. It is processed in real time and <strong>not stored</strong> after results are returned.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Usage data</div>
+        <div class="row-value">Basic request logs (timestamps, word counts, feature used) for billing, rate limiting, and abuse prevention. No essay content is included in logs.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Payment info</div>
+        <div class="row-value">Handled entirely by our payment processor (Stripe). We never see or store your card number.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What We Never Do</h2>
+    <div class="card">
+      <div class="row">
+        <div class="row-label">Sell your data</div>
+        <div class="row-value"><span class="tag tag-no">Never</span> We do not sell, rent, or share your personal information or submitted text with any third party for commercial purposes.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Train AI models</div>
+        <div class="row-value"><span class="tag tag-no">Never</span> Your writing is not used to train, fine-tune, or evaluate any AI or machine learning model — ours or anyone else's.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Publish your text</div>
+        <div class="row-value"><span class="tag tag-no">Never</span> Your submitted essays are never published, indexed, or made accessible to other users or the public.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Retain essays</div>
+        <div class="row-value"><span class="tag tag-no">Never</span> We do not store the content of your essays after your session ends.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Third-Party Services</h2>
+    <div class="card">
+      <div class="row">
+        <div class="row-label">OpenAI</div>
+        <div class="row-value">Text you submit is processed by OpenAI's API to generate writing feedback. OpenAI's own data usage policies apply to this processing. We use OpenAI's API under terms that prohibit using your data for model training.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Stripe</div>
+        <div class="row-value">Payment processing. Stripe receives your payment details directly. We receive only a transaction confirmation. See <a href="https://stripe.com/privacy" target="_blank" rel="noopener" style="color: var(--accent);">stripe.com/privacy</a>.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Children's Privacy (COPPA)</h2>
+    <div class="card">
+      <div class="row">
+        <div class="row-label">Age requirement</div>
+        <div class="row-value">EssayCoach is not directed at children under 13. We do not knowingly collect personal information from anyone under 13 years of age. If we learn that we have inadvertently collected such information, we will delete it promptly. If you believe a child under 13 has registered, contact us at <a href="mailto:privacy@essaycoach.app" style="color: var(--accent);">privacy@essaycoach.app</a>.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your Rights</h2>
+    <div class="card">
+      <div class="row">
+        <div class="row-label">Access</div>
+        <div class="row-value">You can request a copy of the personal data we hold about you at any time.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Deletion</div>
+        <div class="row-value">You can request deletion of your account and all associated personal data. Email us at <a href="mailto:privacy@essaycoach.app" style="color: var(--accent);">privacy@essaycoach.app</a> and we will process your request within 30 days.</div>
+      </div>
+      <div class="row">
+        <div class="row-label">Correction</div>
+        <div class="row-value">You can update your email or account details at any time from your account settings.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="highlight-card">
+    <strong>Privacy questions?</strong>
+    If you have any questions about this policy or want to exercise your rights, email us at
+    <a href="mailto:privacy@essaycoach.app" style="color: #243e73;">privacy@essaycoach.app</a>.
+    We respond within 3 business days.
+  </div>
+
+</main>
+
+<footer>
+  <p>© 2026 EssayCoach · <a href="/terms.html">Terms of Service</a> · <a href="/privacy.html">Privacy Policy</a> · <a href="/">Back to app</a></p>
+</footer>
+
+</body>
+</html>

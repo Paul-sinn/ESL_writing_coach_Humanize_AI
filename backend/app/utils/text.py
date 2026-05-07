@@ -3,12 +3,15 @@ from __future__ import annotations
 import re
 
 
-WORD_RE = re.compile(r"\b[\w'-]+\b")
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 def count_words(text: str) -> int:
-    return len(WORD_RE.findall(text))
+    tokens = text.split()
+    total = 0
+    for token in tokens:
+        total += max(1, round(len(token) / 5)) if len(token) > 20 else 1
+    return total
 
 
 def split_sentences(text: str) -> list[str]:

@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
 from ..config import get_settings
 from ..schemas import BillingRedirect, BillingStatusResponse, CheckoutOption
+
+try:
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from ..db.models import CreditLedgerDB as _CreditLedgerDBModel
+    from ..db.models import UserAccountDB as _UserAccountDBModel
+    _DB_AVAILABLE = True
+except Exception:
+    _DB_AVAILABLE = False
 
 
 @dataclass
@@ -125,6 +135,113 @@ class BillingService:
 
     def create_checkout_url(self, product_code: str) -> str:
         return f"https://billing.example.com/checkout/{product_code}"
+
+    # ── Async DB methods (real users only) ────────────────────────────────────
+
+    async def async_get_or_create_db_account(self, user_id: str, db: "AsyncSession") -> "_UserAccountDBModel":
+        uid = uuid.UUID(user_id)
+        result = await db.execute(
+            select(_UserAccountDBModel).where(_UserAccountDBModel.user_id == uid)
+        )
+        account = result.scalar_one_or_none()
+        if account is None:
+            account = _UserAccountDBModel(
+                user_id=uid,
+                subscription_status="free",
+                credits_remaining=0,
+                plan_name="Free",
+                monthly_credit_limit=0,
+            )
+            db.add(account)
+            await db.flush()
+        return account
+
+    async def async_load_to_memory(self, user_id: str, db: "AsyncSession") -> None:
+        """Sync real user's DB credits into in-memory dict so graph nodes can read them."""
+        account = await self.async_get_or_create_db_account(user_id, db)
+        self._accounts[user_id] = UserAccount(
+            user_id=user_id,
+            subscription_status=account.subscription_status,
+            credits_remaining=account.credits_remaining,
+        )
+
+    async def async_deduct_credits(self, user_id: str, amount: int, db: "AsyncSession") -> None:
+        """Persist credit deduction to DB with row-level lock."""
+        if amount <= 0:
+            return
+        result = await db.execute(
+            select(_UserAccountDBModel)
+            .where(_UserAccountDBModel.user_id == uuid.UUID(user_id))
+            .with_for_update()
+        )
+        account = result.scalar_one()
+        account.credits_remaining = max(0, account.credits_remaining - amount)
+        self._accounts[user_id] = UserAccount(
+            user_id=user_id,
+            subscription_status=account.subscription_status,
+            credits_remaining=account.credits_remaining,
+        )
+
+    async def async_reserve_credits(self, user_id: str, amount: int, feature: str, db: "AsyncSession") -> int:
+        if amount <= 0:
+            raise ValueError("Reservation amount must be positive.")
+        uid = uuid.UUID(user_id)
+        result = await db.execute(
+            select(_UserAccountDBModel)
+            .where(_UserAccountDBModel.user_id == uid)
+            .with_for_update()
+        )
+        account = result.scalar_one()
+        if account.credits_remaining < amount:
+            raise ValueError("Insufficient credits.")
+        account.credits_remaining -= amount
+        ledger = _CreditLedgerDBModel(
+            user_id=uid,
+            feature=feature,
+            amount=amount,
+            status="reserved",
+        )
+        db.add(ledger)
+        await db.flush()
+        self._accounts[user_id] = UserAccount(
+            user_id=user_id,
+            subscription_status=account.subscription_status,
+            credits_remaining=account.credits_remaining,
+        )
+        return int(ledger.id)
+
+    async def async_capture_reservation(self, ledger_id: int, db: "AsyncSession") -> None:
+        result = await db.execute(
+            select(_CreditLedgerDBModel)
+            .where(_CreditLedgerDBModel.id == ledger_id)
+            .with_for_update()
+        )
+        ledger = result.scalar_one()
+        if ledger.status == "reserved":
+            ledger.status = "charged"
+
+    async def async_release_reservation(self, ledger_id: int, db: "AsyncSession") -> None:
+        result = await db.execute(
+            select(_CreditLedgerDBModel)
+            .where(_CreditLedgerDBModel.id == ledger_id)
+            .with_for_update()
+        )
+        ledger = result.scalar_one()
+        if ledger.status != "reserved":
+            return
+        account_result = await db.execute(
+            select(_UserAccountDBModel)
+            .where(_UserAccountDBModel.user_id == ledger.user_id)
+            .with_for_update()
+        )
+        account = account_result.scalar_one()
+        account.credits_remaining += ledger.amount
+        ledger.status = "released"
+        self._accounts[str(account.user_id)] = UserAccount(
+            user_id=str(account.user_id),
+            subscription_status=account.subscription_status,
+            credits_remaining=account.credits_remaining,
+        )
 
 
 billing_service = BillingService()

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — EssayCoach</title>
+  <style>
+    :root {
+      --bg: #f2d5ce;
+      --panel: rgba(255, 250, 248, 0.88);
+      --border: rgba(36, 62, 115, 0.12);
+      --ink: #1e3259;
+      --muted: #5e7195;
+      --accent: #243e73;
+      --accent-soft: #8bb4d9;
+      font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(138, 180, 216, 0.45), transparent 28%),
+        linear-gradient(180deg, #fcf7f5 0%, #f2d5ce 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    header {
+      background: rgba(255, 250, 248, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+
+    .back-link {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    .hero {
+      margin-bottom: 48px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent-soft);
+      background: rgba(36, 62, 115, 0.08);
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .updated {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .intro {
+      margin-top: 20px;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--muted);
+      padding: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      border-left: 3px solid var(--accent-soft);
+    }
+
+    section {
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--accent-soft);
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .clause {
+      display: flex;
+      gap: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .clause:last-child { border-bottom: none; }
+    .clause:hover { background: rgba(36, 62, 115, 0.03); }
+
+    .clause-num {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(36, 62, 115, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-soft);
+      margin-top: 1px;
+    }
+
+    .clause-text {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--ink);
+    }
+
+    .highlight-card {
+      background: rgba(36, 62, 115, 0.05);
+      border: 1px solid rgba(36, 62, 115, 0.15);
+      border-radius: 14px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .highlight-card strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--accent-soft);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="/">EssayCoach</a>
+  <a class="back-link" href="/">← Back to app</a>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="badge">Legal</div>
+    <h1>Terms of Service</h1>
+    <p class="updated">Last updated: May 2026</p>
+
+    <p class="intro">
+      EssayCoach is a writing assistance tool — not an AI detector bypass service.
+      By using EssayCoach, you agree to the terms below. Please read them before submitting your writing.
+    </p>
+  </div>
+
+  <section>
+    <h2>What This Service Is</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">1</div>
+        <p class="clause-text">This service is a writing assistance tool designed to improve clarity, readability, tone, and natural flow — similar in purpose to a grammar checker or writing tutor. It enhances text you have already written; it does not generate content from scratch. It is not designed to bypass academic integrity systems or guarantee any AI detection result.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">2</div>
+        <p class="clause-text">Any AI-likeness percentage or feedback shown in the product is an informational estimate only and should not be treated as a guaranteed detector result.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>No Detection Guarantees</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">3</div>
+        <p class="clause-text">We do not guarantee any specific AI detection score, Turnitin result, GPTZero result, ZeroGPT result, or similar outcome.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">4</div>
+        <p class="clause-text">AI detection results may vary by tool, model version, text length, writing style, language, and reviewer settings. No writing tool can guarantee a specific score.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your Responsibility</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">5</div>
+        <p class="clause-text">You are responsible for ensuring that your use of this service follows your school, workplace, or platform policies. Always review your institution's AI use policy before submitting. This responsibility applies especially to students in ESL or intensive English programs, where rules regarding "external assistance" or "tutor usage" may differ by program or instructor.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">6</div>
+        <p class="clause-text">You should review, edit, and verify all output before using or submitting it. Outputs may contain errors, awkward wording, or unintended changes in meaning. You are responsible for the final version of your text. EssayCoach is not liable for any academic, professional, or legal consequences — including failing grades, suspension, expulsion, or termination of employment — arising from your use of this service.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">7</div>
+        <p class="clause-text">You confirm that you have the right to submit the text you upload and that it does not contain content you are not authorized to share.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">8</div>
+        <p class="clause-text">By using this service, you agree to use it as a writing assistance tool and not to submit AI-assisted work in a way that violates applicable school, workplace, or platform policies.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">9</div>
+        <p class="clause-text">Policies on AI-assisted writing vary by institution and individual instructors. It is your responsibility to confirm whether the use of EssayCoach is permitted for a specific assignment. You represent and warrant that your use of this service does not violate your institution's Honor Code or academic integrity policy. You agree to indemnify EssayCoach from any academic consequences resulting from your failure to adhere to your institution's specific guidelines.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">10</div>
+        <p class="clause-text">You must be at least 13 years of age to use this service. By using EssayCoach, you confirm that you meet this age requirement. If you are under 18, you represent that you have obtained parental or guardian consent. We do not knowingly collect personal information from children under 13 in compliance with the Children's Online Privacy Protection Act (COPPA).</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your Data</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">9</div>
+        <p class="clause-text">We do not sell your submitted text or publish it online. Submitted text may be temporarily processed as necessary to provide the service, prevent abuse, improve safety, or comply with legal obligations.</p>
+      </div>
+      <div class="clause">
+        <div class="clause-num">10</div>
+        <p class="clause-text"><strong>Your writing is never used to train AI models.</strong> Text you submit is processed solely to return results to you and is not retained for model training purposes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Credits & Refunds</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">11</div>
+        <p class="clause-text">Credits are consumed when a request is processed. Processed credits may not be refundable unless required by law or stated in our refund policy. AI detection algorithms vary across platforms and are updated frequently without notice — a result that appears favorable at one point in time may differ later. Dissatisfaction with AI detection results, including any specific score from Turnitin, GPTZero, ZeroGPT, or similar tools, does not qualify as grounds for a refund or chargeback.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Disclaimer of Sanctions</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">12</div>
+        <p class="clause-text">EssayCoach is not responsible for any academic sanctions, including but not limited to failing grades, course failure, suspension, or expulsion, resulting from the use of this tool in violation of institutional policies. Using this service does not constitute authorization to violate your institution's academic integrity policy.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Service Integrity & Abuse</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">13</div>
+        <p class="clause-text">EssayCoach reserves the right to restrict, suspend, or terminate access to any account without prior notice if abnormal usage patterns are detected — including but not limited to excessive automated requests, suspected scraping, or use that places unreasonable load on our systems. This is to protect service quality for all users.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dispute Resolution</h2>
+    <div class="card">
+      <div class="clause">
+        <div class="clause-num">14</div>
+        <p class="clause-text">Any dispute arising out of or relating to these Terms or your use of EssayCoach shall be resolved through binding individual arbitration, not in court — except that either party may bring claims in small claims court if they qualify. You waive the right to participate in a class action lawsuit or class-wide arbitration. These Terms are governed by the laws of the State of California, without regard to conflict of law principles.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="highlight-card">
+    <strong>Questions or concerns?</strong>
+    If you have questions about these terms or need help with your account, contact us at
+    <a href="mailto:support@essaycoach.app" style="color: #243e73;">support@essaycoach.app</a>.
+    We're here to help.
+  </div>
+
+</main>
+
+<footer>
+  <p>© 2026 EssayCoach · <a href="/terms.html">Terms of Service</a> · <a href="/privacy.html">Privacy Policy</a> · <a href="/">Back to app</a></p>
+</footer>
+
+</body>
+</html>

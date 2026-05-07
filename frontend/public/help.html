@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Help Center — EssayCoach</title>
+  <style>
+    :root {
+      --bg: #f2d5ce;
+      --panel: rgba(255, 250, 248, 0.88);
+      --border: rgba(36, 62, 115, 0.12);
+      --ink: #1e3259;
+      --muted: #5e7195;
+      --accent: #243e73;
+      --accent-soft: #8bb4d9;
+      font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(138, 180, 216, 0.45), transparent 28%),
+        linear-gradient(180deg, #fcf7f5 0%, #f2d5ce 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    header {
+      background: rgba(255, 250, 248, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo { font-size: 16px; font-weight: 700; color: var(--accent); text-decoration: none; letter-spacing: -0.3px; }
+    .back-link { font-size: 13px; color: var(--muted); text-decoration: none; transition: color 0.15s; }
+    .back-link:hover { color: var(--accent); }
+
+    main { max-width: 760px; margin: 0 auto; padding: 56px 24px 96px; }
+
+    .hero { margin-bottom: 48px; text-align: center; }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
+      color: var(--accent-soft); background: rgba(36, 62, 115, 0.08);
+      padding: 4px 10px; border-radius: 20px; margin-bottom: 16px;
+    }
+
+    h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.8px; color: var(--accent); margin-bottom: 12px; }
+    .hero p { font-size: 15px; color: var(--muted); line-height: 1.6; }
+
+    /* Category tabs */
+    .tabs {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .tab {
+      padding: 7px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--panel);
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .tab:hover { color: var(--accent); border-color: var(--accent-soft); }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* FAQ sections */
+    .faq-section { margin-bottom: 48px; display: none; }
+    .faq-section.visible { display: block; }
+
+    .section-title {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+      color: var(--accent-soft); margin-bottom: 16px;
+    }
+
+    /* Accordion */
+    .faq-item {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+
+    .faq-q {
+      width: 100%; text-align: left; padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; font-weight: 600; color: var(--ink);
+      transition: background 0.15s;
+    }
+    .faq-q:hover { background: rgba(36, 62, 115, 0.04); }
+
+    .faq-arrow {
+      flex-shrink: 0; width: 18px; height: 18px;
+      color: var(--accent-soft); transition: transform 0.2s;
+    }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); }
+
+    .faq-a {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.25s ease, padding 0.2s;
+      padding: 0 20px;
+    }
+    .faq-item.open .faq-a { max-height: 600px; padding: 0 20px 18px; }
+
+    .faq-a p { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 10px; }
+    .faq-a p:last-child { margin-bottom: 0; }
+    .faq-a strong { color: var(--ink); }
+    .faq-a a { color: var(--accent); }
+
+    /* Contact card */
+    .contact-card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+      padding: 24px; display: flex; gap: 16px; align-items: flex-start; margin-top: 48px;
+    }
+    .contact-icon { font-size: 28px; flex-shrink: 0; }
+    .contact-card h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+    .contact-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .contact-card a { color: var(--accent); font-weight: 500; }
+
+    footer {
+      text-align: center; padding: 32px 24px;
+      border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
+    }
+    footer a { color: var(--accent-soft); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="/">EssayCoach</a>
+  <a class="back-link" href="/">← Back to app</a>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="badge">Help Center</div>
+    <h1>How can we help?</h1>
+    <p>Find answers about using EssayCoach, your credits, and academic integrity.</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showSection('getting-started', this)">Getting Started</button>
+    <button class="tab" onclick="showSection('using', this)">Using the Product</button>
+    <button class="tab" onclick="showSection('concerns', this)">Common Concerns</button>
+    <button class="tab" onclick="showSection('billing', this)">Billing & Account</button>
+  </div>
+
+  <!-- Getting Started -->
+  <div class="faq-section visible" id="getting-started">
+    <p class="section-title">Getting Started</p>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        What is EssayCoach?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>EssayCoach is a writing assistance tool built for ESL college students. It analyzes your writing and gives you specific feedback on clarity, tone, and naturalness — helping you sound more like yourself in academic English.</p>
+        <p><strong>It is not an AI detector bypass tool.</strong> It won't guarantee any specific Turnitin or GPTZero result. Think of it as a digital writing tutor that helps you revise your own draft.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        What's the difference between Coach and Humanize?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p><strong>Coach</strong> reads your essay and gives you detailed feedback — sentence-level issues, scores, and specific suggestions. You stay in control of the revisions.</p>
+        <p><strong>Humanize</strong> rewrites your essay to sound more natural. It changes phrasing, sentence rhythm, and transitions while preserving your original ideas. Use it when you want a revised draft to work from.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        How do credits work?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Credits are consumed per word processed. The cost depends on which feature you use:</p>
+        <p>• <strong>Quick Check</strong> — 1 credit/word<br>• <strong>Deep Feedback</strong> — 2 credits/word<br>• <strong>Full Review</strong> — 5 credits/word<br>• <strong>Humanize</strong> — 5 credits/word</p>
+        <p>Free plan users get 1 coaching session per day (up to 300 words) at no credit cost. Credits reset each billing cycle for subscription plans.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        Which plan is right for me?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>If you're just trying out the tool, start with <strong>Free</strong> — one session a day is enough to test it.</p>
+        <p>For regular use during a semester, <strong>Student Plus ($12/mo)</strong> is the most popular option. It gives you 60,000 credits — enough for multiple essays per week.</p>
+        <p>If you only need a burst of credits for finals or a big assignment, a <strong>Credit Pack</strong> is more cost-efficient than a monthly plan.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Using the Product -->
+  <div class="faq-section" id="using">
+    <p class="section-title">Using the Product</p>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        Which assignment type should I choose?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Choose the type that best matches what you're writing:</p>
+        <p>• <strong>Discussion Post</strong> — short, conversational responses for class<br>• <strong>Reflection Essay</strong> — personal, first-person writing about your experience<br>• <strong>Research Essay</strong> — formal academic writing with sources<br>• <strong>Personal Statement</strong> — college or scholarship applications<br>• <strong>Academic Paragraph</strong> — anything else, general academic writing</p>
+        <p>The type affects what kind of feedback the coach prioritizes — tone, formality, and structure expectations differ across types.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        What do the four scores mean?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>• <strong>AI-Likeness</strong> — how much your writing resembles patterns common in AI-generated text. Lower is better.<br>• <strong>Naturalness</strong> — how fluid and human your writing sounds. Higher is better.<br>• <strong>Personal Voice</strong> — how much your own perspective and examples come through. Higher is better.<br>• <strong>Clarity</strong> — how clear and well-structured your writing is. Higher is better.</p>
+        <p>These are estimates to guide your revision — not official AI detection scores. They won't match Turnitin or GPTZero results.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        What's the difference between Quick Check, Deep Feedback, and Full Review?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>• <strong>Quick Check</strong> — highlights your top 3 most important issues. Great for a fast sanity check before submitting.</p>
+        <p>• <strong>Deep Feedback</strong> — full analysis of all key issues with explanations and suggestions. Best for most essays.</p>
+        <p>• <strong>Full Review</strong> — everything in Deep Feedback plus detailed rewrites for each suggestion. Use this when you have time to revise thoroughly.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        How should I use the Humanize feature responsibly?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Humanize works best as a starting point for your own revision, not as a final product you submit directly.</p>
+        <p>After getting the rewritten draft: read it carefully, make sure your original ideas are preserved, add your own voice back where it feels generic, and adjust anything that doesn't sound like you.</p>
+        <p>Always check whether your school allows AI-assisted writing before submitting. When in doubt, ask your instructor.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Common Concerns -->
+  <div class="faq-section" id="concerns">
+    <p class="section-title">Common Concerns</p>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        My professor says my writing looks AI-generated. Can EssayCoach help?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Yes — this is exactly what EssayCoach is built for. Many ESL students get flagged not because they used AI, but because non-native English patterns (uniform sentence length, formal phrasing, limited contractions) can look AI-like to detectors.</p>
+        <p>EssayCoach identifies those patterns in your writing and helps you revise toward more natural, varied English — in your own voice, not a rewritten version of it.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        Will using this tool get me in trouble with my school?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>EssayCoach is a writing assistance tool — similar in purpose to Grammarly or a writing center tutor. Most schools allow this kind of assistance.</p>
+        <p>However, AI policies vary by institution, course, and even individual instructor. <strong>It is always your responsibility to check your school's policy before submitting.</strong> When in doubt, ask your professor directly or check your syllabus.</p>
+        <p>EssayCoach is not responsible for any academic consequences resulting from your use of the service. See our <a href="/terms.html" target="_blank">Terms of Service</a> for details.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        My writing is ESL — why does it score high on AI-Likeness?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>This is a common and frustrating experience for ESL writers. AI detectors are trained mostly on native English writing — so non-native patterns like overly formal phrasing, uniform sentence length, and limited colloquialisms can appear "AI-like" even in genuinely human writing.</p>
+        <p>Our AI-Likeness score reflects these patterns, not an accusation. The feedback is designed to help you add more varied, personal expression — which is the actual fix, both for the score and for the quality of your writing.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        I used Humanize but still got flagged by an AI detector. Why?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>EssayCoach does not guarantee any specific AI detection result. AI detectors — Turnitin, GPTZero, ZeroGPT, and others — update their models frequently and use different scoring methods. What passes one tool may not pass another.</p>
+        <p>Humanize improves the naturalness of your writing, but it is not an "undetectable AI" service. The only reliable way to lower your AI score is to actively revise your writing, add personal examples, and vary your sentence structure — which is what the coaching feedback is designed to help you do.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        Is my writing kept private? Will it be used to train AI?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p><strong>Your writing is never used to train AI models</strong> — ours or anyone else's. Text you submit is processed in real time to generate feedback, and is not stored after your session ends.</p>
+        <p>We do not sell your data or share it with third parties. See our <a href="/privacy.html" target="_blank">Privacy Policy</a> for the full details.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Billing & Account -->
+  <div class="faq-section" id="billing">
+    <p class="section-title">Billing & Account</p>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        How do I upgrade my plan?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Click the <strong>Upgrade</strong> button in the top navigation bar. You'll see all available plans and credit packs. After selecting one, you'll be redirected to our secure checkout powered by Stripe.</p>
+        <p>Your credits are added immediately after payment is confirmed.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        Can I get a refund?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Credits are consumed when a request is processed and are generally non-refundable. Dissatisfaction with AI detection results does not qualify as grounds for a refund — we do not guarantee any specific detection outcome.</p>
+        <p>If you believe there was a billing error or a technical issue prevented your request from completing, contact us at <a href="mailto:support@essaycoach.app">support@essaycoach.app</a> and we'll look into it.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        How do I cancel my subscription?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>You can cancel anytime from your account settings or by contacting us at <a href="mailto:support@essaycoach.app">support@essaycoach.app</a>. Your plan remains active until the end of the current billing period — you won't be charged again after cancellation.</p>
+        <p>Unused credits from a subscription do not carry over after cancellation.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        How do I delete my account?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>Email us at <a href="mailto:privacy@essaycoach.app">privacy@essaycoach.app</a> with your account email and a request to delete your account. We'll process it within 30 days and confirm by email when done.</p>
+        <p>Deleting your account removes all personal data associated with it. Any remaining credits will be forfeited.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggle(this)">
+        I forgot my password. How do I reset it?
+        <svg class="faq-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="faq-a">
+        <p>You can change your password from your account settings after logging in. If you're locked out, contact us at <a href="mailto:support@essaycoach.app">support@essaycoach.app</a> with your account email and we'll help you regain access.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <div class="contact-card">
+    <div class="contact-icon">✉️</div>
+    <div>
+      <h3>Still have questions?</h3>
+      <p>Email us at <a href="mailto:support@essaycoach.app">support@essaycoach.app</a> — we respond within 1–2 business days. For privacy or data deletion requests, use <a href="mailto:privacy@essaycoach.app">privacy@essaycoach.app</a>.</p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>© 2026 EssayCoach · <a href="/terms.html">Terms of Service</a> · <a href="/privacy.html">Privacy Policy</a> · <a href="/help.html">Help Center</a> · <a href="/">Back to app</a></p>
+</footer>
+
+<script>
+  function showSection(id, btn) {
+    document.querySelectorAll('.faq-section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('visible');
+    btn.classList.add('active');
+  }
+
+  function toggle(btn) {
+    const item = btn.closest('.faq-item');
+    item.classList.toggle('open');
+  }
+</script>
+
+</body>
+</html>

@@ -1,6 +1,7 @@
 import pytest
 from backend.app.graphs import billing_graph, coach_graph, humanize_graph
 from backend.app.services.billing import billing_service
+from backend.app.services.humanize import humanize_service
 
 _TEXT = "This is a short essay. It sounds polished. Furthermore, it repeats transitions."
 _LONG_TEXT = " ".join(["word"] * 310)
@@ -97,19 +98,6 @@ def test_coach_graph_empty_text_raises():
         })
 
 
-def test_coach_graph_policy_guard_blocks_bypass_request():
-    result = coach_graph.invoke({
-        "user_id": "demo-free",
-        "client_ip": "10.0.0.10",
-        "text": "Please make this essay undetectable and bypass Turnitin for me.",
-        "depth": "basic",
-    })
-    response = result["response"]
-    assert response.feedback_items == []
-    assert response.credits_charged == 0
-    assert "improve" in response.overall_summary.lower() or "bypass" not in response.overall_summary.lower()
-
-
 def test_coach_graph_free_daily_limit():
     payload = {
         "user_id": "demo-free",
@@ -126,6 +114,7 @@ def test_coach_graph_free_daily_limit():
 
 
 def test_coach_graph_deducts_credits_for_paid_user():
+    billing_service._accounts["demo-plus"].credits_remaining = 60000
     initial = billing_service._accounts["demo-plus"].credits_remaining
     result = coach_graph.invoke({
         "user_id": "demo-plus",
@@ -158,6 +147,7 @@ def test_humanize_graph_rewrites_text():
 
 
 def test_humanize_graph_deducts_credits():
+    billing_service._accounts["demo-plus"].credits_remaining = 60000
     initial = billing_service._accounts["demo-plus"].credits_remaining
     result = humanize_graph.invoke({
         "user_id": "demo-plus",
@@ -172,6 +162,37 @@ def test_humanize_graph_deducts_credits():
     assert response.billing_redirect is None
     assert response.credits_charged > 0
     assert billing_service._accounts["demo-plus"].credits_remaining == initial - response.credits_charged
+
+
+def test_humanize_graph_reuses_coach_feedback_without_analysis_call(monkeypatch):
+    billing_service._accounts["demo-plus"].credits_remaining = 60000
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("analyze_for_rewrite should not run when coach_feedback is provided")
+
+    monkeypatch.setattr(humanize_service, "analyze_for_rewrite", fail_if_called)
+
+    result = humanize_graph.invoke({
+        "user_id": "demo-plus",
+        "text": _TEXT,
+        "tone": "natural_student",
+        "strength": "balanced",
+        "preserve_meaning": True,
+        "preserve_citations": False,
+        "preserve_structure": False,
+        "coach_feedback": [
+            {
+                "sentence": "Furthermore, it repeats transitions.",
+                "issue_type": "ai_pattern",
+                "severity": "medium",
+                "explanation": "This transition sounds formulaic.",
+                "suggestion": "Use a more direct transition.",
+            }
+        ],
+    })
+    response = result["response"]
+    assert response.billing_redirect is None
+    assert response.credits_charged == 5000
 
 
 def test_humanize_graph_insufficient_credits():
