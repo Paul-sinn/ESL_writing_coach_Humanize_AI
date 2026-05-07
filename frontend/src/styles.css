@@ -586,6 +586,32 @@ button:disabled {
   align-items: start;
 }
 
+.card-toggle-header {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.result-header-inner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.card-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .verdict.low {
   background: rgba(138, 180, 216, 0.2);
 }
@@ -1148,10 +1174,53 @@ button:disabled {
 }
 
 /* ── Feedback items ── */
+/* ── Collapsible ── */
+.collapsible {
+  margin-top: 20px;
+}
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-align: left;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.collapsible-header:hover {
+  color: var(--accent-strong);
+}
+
+.collapsible-arrow {
+  font-size: 1rem;
+  color: var(--muted);
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.collapsible-arrow.open {
+  transform: rotate(90deg);
+}
+
+.collapsible-body {
+  padding-top: 14px;
+}
+
 .feedback-list {
   display: grid;
   gap: 12px;
-  margin-top: 20px;
 }
 
 .feedback-item {
@@ -1217,7 +1286,7 @@ button:disabled {
 
 /* ── Strengths ── */
 .strengths-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .strengths-label {
@@ -1341,7 +1410,7 @@ button:disabled {
 }
 
 .signal-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .signal-section-label,
@@ -1518,8 +1587,8 @@ button:disabled {
 
 /* ── Improvements ── */
 .improvements-list {
-  margin-top: 16px;
-  padding: 14px 16px;
+  margin-top: 0;
+  padding: 10px 16px;
   border-radius: 16px;
   background: rgba(138, 180, 216, 0.08);
   border: 1px solid rgba(138, 180, 216, 0.18);

@@ -117,6 +117,8 @@ def calculate_coach_credits(word_count: int, depth: str) -> int:
     )
 
 
+
+
 def calculate_humanize_credits(word_count: int) -> int:
     return max(word_count * settings.humanize_cost_per_word, settings.humanize_min_credits)
 

@@ -82,6 +82,19 @@ async function fetchJson(path, options = {}) {
   return data;
 }
 
+function Collapsible({ label, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="collapsible">
+      <button className="collapsible-header" onClick={() => setOpen(o => !o)}>
+        <span>{label}</span>
+        <span className={`collapsible-arrow${open ? " open" : ""}`}>›</span>
+      </button>
+      {open && <div className="collapsible-body">{children}</div>}
+    </div>
+  );
+}
+
 function ScoreCard({ label, score, invert = false }) {
   const raw = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
   const colorClass = invert
@@ -107,6 +120,8 @@ export default function App() {
   const [writingLevel, setWritingLevel] = useState("intermediate");
   const [depth, setDepth] = useState("deep");
   const [result, setResult] = useState(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(true);
+  const [humanizeOpen, setHumanizeOpen] = useState(true);
   const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -215,6 +230,7 @@ export default function App() {
         body: JSON.stringify({ text, assignment_type: assignmentType, writing_level: writingLevel, depth }),
       });
       setResult(data);
+      setFeedbackOpen(true);
       setCoachFeedback(data.feedback_items?.length ? data.feedback_items : null);
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
@@ -245,6 +261,7 @@ export default function App() {
         }),
       });
       setHumanizeResult(data);
+      setHumanizeOpen(true);
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
     } catch (err) {
@@ -836,82 +853,77 @@ export default function App() {
           {/* Feedback result */}
           {result && !result.billing_redirect && (
             <section className="result-card" id="results" ref={resultRef}>
-              <div className="result-header">
-                <div>
-                  <div className="eyebrow">Writing Analysis</div>
-                  <h2>Your Writing Scores</h2>
-                </div>
-                <div className={`verdict ${result.verdict_label}`}>
-                  {result.verdict_label === "high" ? "High AI-like"
-                    : result.verdict_label === "medium" ? "Some AI patterns"
-                    : "Mostly Human"}
-                </div>
-              </div>
-
-              <div className="score-grid">
-                <ScoreCard label="AI-Like Writing" score={result.ai_like_score} invert />
-                <ScoreCard label="Naturalness" score={result.naturalness_score} />
-                <ScoreCard label="Personal Voice" score={result.personal_voice_score} />
-                <ScoreCard label="Clarity" score={result.clarity_score} />
-              </div>
-
-              <p className="result-summary-text">{result.overall_summary}</p>
-
-              {result.signals?.length > 0 && (
-                <div className="signal-section">
-                  <div className="signal-section-label">Detected Patterns</div>
-                  <div className="signal-list">
-                    {result.signals.map((s, i) => <span key={i}>{s}</span>)}
+              <button className="card-toggle-header" onClick={() => setFeedbackOpen(o => !o)}>
+                <div className="result-header-inner">
+                  <div>
+                    <div className="eyebrow">Writing Analysis</div>
+                    <h2>Your Writing Scores</h2>
                   </div>
-                </div>
-              )}
-
-              {result.strengths.length > 0 && (
-                <div className="strengths-section">
-                  <div className="strengths-label">What's working well</div>
-                  <div className="signal-list">
-                    {result.strengths.map((s, i) => <span key={i} className="strength-chip">{s}</span>)}
-                  </div>
-                </div>
-              )}
-
-              {result.feedback_items.length > 0 && (
-                <div className="feedback-list">
-                  <div className="feedback-list-label">Writing Issues</div>
-                  {result.feedback_items.map((item, i) => (
-                    <div key={i} className={`feedback-item issue-${item.issue_type}`}>
-                      <div className="feedback-header">
-                        <span className="issue-badge">{ISSUE_LABELS[item.issue_type] ?? item.issue_type}</span>
-                        <span className={`severity-badge severity-${item.severity}`}>
-                          {item.severity?.toUpperCase()}
-                        </span>
-                      </div>
-                      <blockquote className="feedback-quote">"{item.sentence}"</blockquote>
-                      <p className="feedback-explanation">{item.explanation}</p>
-                      <div className="feedback-suggestion">
-                        <span className="suggestion-label">Try this:</span> {item.suggestion}
-                      </div>
+                  <div className="card-toggle-right">
+                    <div className={`verdict ${result.verdict_label}`}>
+                      {result.verdict_label === "high" ? "High AI-like"
+                        : result.verdict_label === "medium" ? "Some AI patterns"
+                        : "Mostly Human"}
                     </div>
-                  ))}
+                    <span className={`collapsible-arrow${feedbackOpen ? " open" : ""}`}>›</span>
+                  </div>
                 </div>
+              </button>
+
+              {feedbackOpen && (
+                <>
+                  <div className="score-grid">
+                    <ScoreCard label="AI-Like Writing" score={result.ai_like_score} invert />
+                    <ScoreCard label="Naturalness" score={result.naturalness_score} />
+                    <ScoreCard label="Personal Voice" score={result.personal_voice_score} />
+                    <ScoreCard label="Clarity" score={result.clarity_score} />
+                  </div>
+
+                  <p className="result-summary-text">{result.overall_summary}</p>
+
+                  {result.signals?.length > 0 && (
+                    <Collapsible label="Detected Patterns">
+                      <div className="signal-list">
+                        {result.signals.map((s, i) => <span key={i}>{s}</span>)}
+                      </div>
+                    </Collapsible>
+                  )}
+
+                  {result.strengths.length > 0 && (
+                    <Collapsible label="What's working well">
+                      <div className="signal-list">
+                        {result.strengths.map((s, i) => <span key={i} className="strength-chip">{s}</span>)}
+                      </div>
+                    </Collapsible>
+                  )}
+
+                  {result.feedback_items.length > 0 && (
+                    <Collapsible label="Writing Issues">
+                      {result.feedback_items.map((item, i) => (
+                        <div key={i} className={`feedback-item issue-${item.issue_type}`}>
+                          <div className="feedback-header">
+                            <span className="issue-badge">{ISSUE_LABELS[item.issue_type] ?? item.issue_type}</span>
+                            <span className={`severity-badge severity-${item.severity}`}>
+                              {item.severity?.toUpperCase()}
+                            </span>
+                          </div>
+                          <blockquote className="feedback-quote">"{item.sentence}"</blockquote>
+                          <p className="feedback-explanation">{item.explanation}</p>
+                          <div className="feedback-suggestion">
+                            <span className="suggestion-label">Try this:</span> {item.suggestion}
+                          </div>
+                        </div>
+                      ))}
+                    </Collapsible>
+                  )}
+
+                  <div className="credits-footer">
+                    Credits used: <strong>{result.credits_charged}</strong>
+                    {" · "}
+                    Remaining: <strong>{result.credits_remaining.toLocaleString()}</strong>
+                  </div>
+                </>
               )}
-
-              <p className="disclaimer-text">
-                These scores are writing-pattern estimates, not guaranteed AI detector results.
-                Always follow your school's academic integrity policy.
-              </p>
-
-              <div className="integrity-card">
-                <div className="integrity-label">Academic Integrity</div>
-                <p>{result.integrity_note}</p>
-                <div className="disclosure-box">{result.disclosure_statement}</div>
-              </div>
-
-              <div className="credits-footer">
-                Credits used: <strong>{result.credits_charged}</strong>
-                {" · "}
-                Remaining: <strong>{result.credits_remaining.toLocaleString()}</strong>
-              </div>
             </section>
           )}
 
@@ -923,36 +935,44 @@ export default function App() {
 
           {humanizeResult && !humanizeResult.billing_redirect && (
             <section className="result-card" ref={humanizeResultRef}>
-              <div className="result-header">
-                <div>
-                  <div className="eyebrow">Humanized</div>
-                  <h2>{humanizeResult.summary_of_changes}</h2>
+              <button className="card-toggle-header" onClick={() => setHumanizeOpen(o => !o)}>
+                <div className="result-header-inner">
+                  <div>
+                    <div className="eyebrow">Humanized</div>
+                    <h2>{humanizeResult.summary_of_changes}</h2>
+                  </div>
+                  <div className="card-toggle-right">
+                    <div className="verdict humanized">Rewritten</div>
+                    <span className={`collapsible-arrow${humanizeOpen ? " open" : ""}`}>›</span>
+                  </div>
                 </div>
-                <div className="verdict humanized">Rewritten</div>
-              </div>
-              <div className="compare-grid">
-                <div>
-                  <div className="compare-label">Original</div>
-                  <div className="compare-text">{text}</div>
-                </div>
-                <div>
-                  <div className="compare-label">Humanized</div>
-                  <div className="compare-text">{humanizeResult.rewritten_text}</div>
-                </div>
-              </div>
-              {humanizeResult.key_improvements?.length > 0 && (
-                <div className="improvements-list">
-                  <div className="improvements-label">Key improvements</div>
-                  <ul>
-                    {humanizeResult.key_improvements.map((imp, i) => <li key={i}>{imp}</li>)}
-                  </ul>
-                </div>
+              </button>
+              {humanizeOpen && (
+                <>
+                  <div className="compare-grid">
+                    <div>
+                      <div className="compare-label">Original</div>
+                      <div className="compare-text">{text}</div>
+                    </div>
+                    <div>
+                      <div className="compare-label">Humanized</div>
+                      <div className="compare-text">{humanizeResult.rewritten_text}</div>
+                    </div>
+                  </div>
+                  {humanizeResult.key_improvements?.length > 0 && (
+                    <Collapsible label="Key improvements">
+                      <ul className="improvements-list">
+                        {humanizeResult.key_improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                      </ul>
+                    </Collapsible>
+                  )}
+                  <div className="credits-footer">
+                    Credits used: <strong>{humanizeResult.credits_charged}</strong>
+                    {" · "}
+                    Remaining: <strong>{humanizeResult.credits_remaining.toLocaleString()}</strong>
+                  </div>
+                </>
               )}
-              <div className="credits-footer">
-                Credits used: <strong>{humanizeResult.credits_charged}</strong>
-                {" · "}
-                Remaining: <strong>{humanizeResult.credits_remaining.toLocaleString()}</strong>
-              </div>
             </section>
           )}
 
