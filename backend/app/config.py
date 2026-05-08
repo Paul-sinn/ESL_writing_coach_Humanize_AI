@@ -41,9 +41,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/esl_coach",
         alias="DATABASE_URL",
     )
-    jwt_secret_key: str = Field(default="change-me-in-production", alias="JWT_SECRET_KEY")
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    supabase_jwt_secret: str = Field(default="", alias="SUPABASE_JWT_SECRET")
 
 
 @lru_cache

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useAuth } from "./context/AuthContext";
+import { supabase } from "./lib/supabase";
+import LandingPage from "./components/LandingPage";
 
 const WORD_LIMIT = 1200;
 const FREE_WORD_LIMIT = 300;
@@ -62,7 +65,8 @@ function countWords(text) {
 }
 
 async function fetchJson(path, options = {}) {
-  const token = localStorage.getItem("token");
+  const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+  const token = session?.access_token;
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { "Authorization": `Bearer ${token}` } : {}),
@@ -110,6 +114,7 @@ function ScoreCard({ label, score, invert = false }) {
 }
 
 export default function App() {
+  const { user, loading: authStateLoading, signInWithGoogle, signInWithPassword, signUp: supabaseSignUp, signOut: supabaseSignOut } = useAuth();
   const [showEditor, setShowEditor] = useState(() => localStorage.getItem("showEditor") === "true");
 
   useEffect(() => {
@@ -138,13 +143,6 @@ export default function App() {
   const [preserveStructure, setPreserveStructure] = useState(false);
 
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
-  const [currentUser, setCurrentUser] = useState(() => {
-    const token = localStorage.getItem("token");
-    const email = localStorage.getItem("userEmail");
-    const username = localStorage.getItem("userUsername");
-    const nickname = localStorage.getItem("userNickname");
-    return token ? { token, email, username, nickname } : null;
-  });
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "verify"
   const [authEmail, setAuthEmail] = useState("");
@@ -217,7 +215,15 @@ export default function App() {
     fetchJson("/api/billing/status")
       .then(setBilling)
       .catch(() => setBilling(null));
-  }, []);
+  }, [user]);
+
+  // Protect editor: redirect to landing + open auth modal when not logged in
+  useEffect(() => {
+    if (showEditor && !authStateLoading && !user) {
+      setShowEditor(false);
+      setShowAuthModal(true);
+    }
+  }, [showEditor, user, authStateLoading]);
 
   async function handleCoach() {
     setLoading(true);
@@ -285,15 +291,11 @@ export default function App() {
   }
 
 
-  function handleLogout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("userUsername");
-    localStorage.removeItem("userNickname");
-    setCurrentUser(null);
+  async function handleLogout() {
+    await supabaseSignOut();
     setProfileOpen(false);
     setBilling(null);
-    fetchJson("/api/billing/status").then(setBilling).catch(() => {});
+    setShowEditor(false);
   }
 
   function openAuth(mode = "login") {
@@ -306,16 +308,6 @@ export default function App() {
     setAuthError("");
     setShowAuthModal(true);
     setProfileOpen(false);
-  }
-
-  async function checkEmail() {
-    if (!authEmail) return;
-    setEmailChecking(true);
-    try {
-      const data = await fetchJson(`/api/auth/check-email?email=${encodeURIComponent(authEmail)}`);
-      setEmailAvail(data.available);
-    } catch { setEmailAvail(false); }
-    finally { setEmailChecking(false); }
   }
 
   async function checkUsername() {
@@ -333,17 +325,15 @@ export default function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const data = await fetchJson("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email: authEmail, username: authUsername, nickname: authUsername, password: authPassword, password_confirm: authPasswordConfirm }),
+      const { session: newSession } = await supabaseSignUp(authEmail, authPassword, {
+        username: authUsername,
+        nickname: authUsername,
       });
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("userEmail", data.email);
-      localStorage.setItem("userUsername", data.username ?? "");
-      localStorage.setItem("userNickname", data.nickname ?? "");
-      setCurrentUser({ token: data.access_token, email: data.email, username: data.username, nickname: data.nickname });
-      setShowAuthModal(false);
-      setBilling(await fetchJson("/api/billing/status"));
+      if (newSession) {
+        setShowAuthModal(false);
+      } else {
+        setAuthMode("verify");
+      }
     } catch (err) {
       setAuthError(err.message);
     } finally {
@@ -356,17 +346,8 @@ export default function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const data = await fetchJson("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
-      });
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("userEmail", data.email);
-      localStorage.setItem("userUsername", data.username ?? "");
-      localStorage.setItem("userNickname", data.nickname ?? "");
-      setCurrentUser({ token: data.access_token, email: data.email, username: data.username, nickname: data.nickname });
+      await signInWithPassword(authEmail, authPassword);
       setShowAuthModal(false);
-      setBilling(await fetchJson("/api/billing/status"));
     } catch (err) {
       setAuthError(err.message);
     } finally {
@@ -374,8 +355,16 @@ export default function App() {
     }
   }
 
-  const planInitial = currentUser
-    ? currentUser.email[0].toUpperCase()
+  async function handleGoogleSignIn() {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  }
+
+  const planInitial = user
+    ? (user.user_metadata?.full_name || user.email)[0].toUpperCase()
     : (billing?.plan_name ?? "F")[0].toUpperCase();
 
   return (
@@ -415,11 +404,11 @@ export default function App() {
 
             {profileOpen && (
               <div className="profile-dropdown">
-                {currentUser ? (
+                {user ? (
                   <div className="pd-account-row">
                     <div>
-                      <div className="pd-user-nickname">{currentUser.nickname || currentUser.email}</div>
-                      <div className="pd-user-handle">@{currentUser.username || ""}</div>
+                      <div className="pd-user-nickname">{user.user_metadata?.full_name || user.user_metadata?.nickname || user.email}</div>
+                      <div className="pd-user-handle">{user.user_metadata?.username ? `@${user.user_metadata.username}` : user.email}</div>
                     </div>
                     {billing && <div className="pd-plan-badge">{billing.plan_name}</div>}
                   </div>
@@ -430,7 +419,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="pd-divider" />
-                {currentUser ? (
+                {user ? (
                   <button className="pd-item" onClick={handleLogout}>
                     <span className="pd-icon">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -549,23 +538,28 @@ export default function App() {
           <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
             <button className="auth-modal-close" onClick={() => setShowAuthModal(false)}>✕</button>
 
+            {authMode === "verify" && (
+              <div className="auth-modal-header">
+                <h3>Check your email</h3>
+                <p>We sent a confirmation link to <strong>{authEmail}</strong>. Click the link to activate your account.</p>
+              </div>
+            )}
+
             {authMode === "register" && (
               <>
                 <div className="auth-modal-header">
                   <h3>Create account</h3>
                   <p>Start coaching your ESL academic writing for free.</p>
                 </div>
+                <button type="button" className="auth-google-btn" onClick={handleGoogleSignIn}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                  Continue with Google
+                </button>
+                <div className="auth-divider"><span>or</span></div>
                 <form onSubmit={handleRegister}>
                   <div className="auth-field">
                     <label>Email</label>
-                    <div className="auth-check-row">
-                      <input type="email" value={authEmail} onChange={(e) => { setAuthEmail(e.target.value); setEmailAvail(null); }} placeholder="you@email.com" required autoFocus />
-                      <button type="button" className="auth-check-btn" onClick={checkEmail} disabled={!authEmail || emailChecking}>
-                        {emailChecking ? "…" : "Check"}
-                      </button>
-                    </div>
-                    {emailAvail === true && <div className="auth-avail-ok">✓ Email is available</div>}
-                    {emailAvail === false && <div className="auth-avail-fail">✗ Email is already in use</div>}
+                    <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="you@email.com" required autoFocus />
                   </div>
                   <div className="auth-field">
                     <label>Username</label>
@@ -591,11 +585,11 @@ export default function App() {
                     <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
                   </label>
                   {authError && <div className="auth-error">{authError}</div>}
-                  <button type="submit" className="auth-submit-btn" disabled={authLoading || emailAvail !== true || usernameAvail !== true || !tosAgreed}>
+                  <button type="submit" className="auth-submit-btn" disabled={authLoading || usernameAvail !== true || !tosAgreed}>
                     {authLoading ? "Creating account…" : "Create account →"}
                   </button>
-                  {(emailAvail !== true || usernameAvail !== true) && !authLoading && (
-                    <div className="auth-check-hint">Please check availability for email and username</div>
+                  {usernameAvail !== true && !authLoading && (
+                    <div className="auth-check-hint">Please check username availability</div>
                   )}
                 </form>
                 <div className="auth-switch">
@@ -611,6 +605,11 @@ export default function App() {
                   <h3>Welcome back</h3>
                   <p>Log in to your Writing Coach account.</p>
                 </div>
+                <button type="button" className="auth-google-btn" onClick={handleGoogleSignIn}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                  Continue with Google
+                </button>
+                <div className="auth-divider"><span>or</span></div>
                 <form onSubmit={handleLogin}>
                   <div className="auth-field">
                     <label>Email</label>
@@ -692,53 +691,10 @@ export default function App() {
 
       {/* ── Hero landing page ── */}
       {!showEditor && (
-        <main className="hero-page">
-          <div className="hero-blobs" aria-hidden="true">
-            <div className="blob blob-1" />
-            <div className="blob blob-2" />
-            <div className="blob blob-3" />
-            <div className="blob blob-4" />
-          </div>
-
-          <div className="hero-glass">
-            <div className="hero-tag">ESL Academic Writing Coach</div>
-
-            <h1 className="hero-headline">
-              Write clearer essays.<br />
-              <span className="hero-headline-accent">Sound more human.</span>
-            </h1>
-
-            <p className="hero-sub">
-              Get AI-powered coaching on your academic writing.<br></br>
-              Detect generic patterns, improve your voice, and rewrite in natural English.
-            </p>
-
-            <div className="hero-features">
-              <div className="hero-feature">
-                <span className="hero-feature-icon">◎</span>
-                AI pattern detection
-              </div>
-              <div className="hero-feature">
-                <span className="hero-feature-icon">◎</span>
-                Personal voice coaching
-              </div>
-              <div className="hero-feature">
-                <span className="hero-feature-icon">◎</span>
-                Humanize rewrite engine
-              </div>
-            </div>
-
-            <div className="hero-free-strip">
-              <span className="hero-free-check">✓</span>
-              Free to start &nbsp;·&nbsp; 1 coaching session per day &nbsp;·&nbsp; No credit card required
-            </div>
-
-            <button className="hero-cta-btn" onClick={() => setShowEditor(true)}>
-              Try it free
-              <span className="hero-cta-arrow">→</span>
-            </button>
-          </div>
-        </main>
+        <LandingPage
+          onStart={() => setShowEditor(true)}
+          onUpgrade={() => setShowUpgradeModal(true)}
+        />
       )}
 
       {/* ── Editor page ── */}

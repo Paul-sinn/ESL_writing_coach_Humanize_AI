@@ -26,7 +26,6 @@ def verdict_from_score(score: int) -> Literal["low", "medium", "high"]:
 
 class CoachState(TypedDict, total=False):
     user_id: str
-    client_ip: str
     text: str
     assignment_type: str
     writing_level: str
@@ -160,7 +159,7 @@ def check_coach_entitlement(state: CoachState) -> dict[str, Any]:
     if state.get("credits_reserved"):
         return {}
     if state.get("subscription_status") == "free":
-        decision = rate_limit_service.check_and_record(state.get("client_ip") or "unknown")
+        decision = rate_limit_service.check_and_record(state["user_id"])
         if not decision.allowed:
             return {
                 "billing_redirect": billing_service.build_redirect(state["user_id"], "Writing Coach"),

@@ -1,4 +1,5 @@
 .env
+.env.local
 .env.*
 __pycache__/
 *.pyc
@@ -12,3 +13,6 @@ frontend/dist/
 *.log
 .DS_Store
 .worktrees/
+.uv.lock
+
+.ai_career_plan.md

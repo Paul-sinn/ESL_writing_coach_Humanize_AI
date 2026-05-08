@@ -6,6 +6,7 @@ from typing import Any
 from ..config import get_settings
 from ..utils.text import count_words, normalize_whitespace
 
+
 settings = get_settings()
 
 try:

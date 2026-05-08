@@ -17,9 +17,9 @@ class DailyBasicAnalysisLimiter:
         self.daily_limit = daily_limit
         self._attempts: dict[tuple[str, date], int] = defaultdict(int)
 
-    def check_and_record(self, ip_address: str) -> RateLimitDecision:
+    def check_and_record(self, user_id: str) -> RateLimitDecision:
         today = date.today()
-        key = (ip_address, today)
+        key = (user_id, today)
         current = self._attempts[key]
         if current >= self.daily_limit:
             return RateLimitDecision(allowed=False, attempts_used=current, daily_limit=self.daily_limit)
