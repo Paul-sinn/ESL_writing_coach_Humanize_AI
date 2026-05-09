@@ -41,7 +41,23 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/esl_coach",
         alias="DATABASE_URL",
     )
+    database_ssl_verify: bool = Field(default=True, alias="DATABASE_SSL_VERIFY")
+    supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_jwt_secret: str = Field(default="", alias="SUPABASE_JWT_SECRET")
+    jwt_secret_key: str = Field(default="local-dev-secret", alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_expire_minutes: int = Field(default=60 * 24, alias="JWT_EXPIRE_MINUTES")
+
+    # Polar payment integration
+    polar_api_base_url: str = Field(default="https://api.polar.sh", alias="POLAR_API_BASE_URL")
+    polar_access_token: str = Field(default="", alias="POLAR_ACCESS_TOKEN")
+    polar_webhook_secret: str = Field(default="", alias="POLAR_WEBHOOK_SECRET")
+    polar_product_id_starter: str = Field(default="", alias="POLAR_PRODUCT_ID_STARTER")
+    polar_product_id_student_plus: str = Field(default="", alias="POLAR_PRODUCT_ID_STUDENT_PLUS")
+    polar_product_id_pro: str = Field(default="", alias="POLAR_PRODUCT_ID_PRO")
+    polar_product_id_credit_s: str = Field(default="", alias="POLAR_PRODUCT_ID_CREDIT_S")
+    polar_product_id_credit_m: str = Field(default="", alias="POLAR_PRODUCT_ID_CREDIT_M")
+    polar_product_id_credit_l: str = Field(default="", alias="POLAR_PRODUCT_ID_CREDIT_L")
 
 
 @lru_cache

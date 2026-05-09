@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,7 +26,12 @@ from .schemas import (
     UserResponse,
 )
 from .services import auth as auth_service
-from .services.billing import billing_service
+from .services.billing import PolarCheckoutConfigError, PolarCheckoutUpstreamError, billing_service
+from .services.polar_webhook import (
+    handle_order_event,
+    handle_subscription_event,
+    verify_webhook_signature,
+)
 from .utils.text import count_words
 
 
@@ -164,7 +170,10 @@ async def billing_status(
         raise HTTPException(status_code=401, detail="Authentication required.")
     user_id = current_user.user_id
     if db is not None:
-        await billing_service.async_load_to_memory(user_id, db)
+        try:
+            await billing_service.async_load_to_memory(user_id, db)
+        except Exception:
+            pass
     return billing_service.get_status(user_id)
 
 
@@ -172,16 +181,22 @@ async def billing_status(
 async def check_username(username: str, db: DbSession) -> dict:
     if db is None:
         return {"available": True}
-    result = await db.execute(select(Profile).where(Profile.username == username))
-    return {"available": result.scalar_one_or_none() is None}
+    try:
+        result = await db.execute(select(Profile).where(Profile.username == username))
+        return {"available": result.scalar_one_or_none() is None}
+    except Exception:
+        return {"available": True}
 
 
 @app.get("/api/auth/check-nickname")
 async def check_nickname(nickname: str, db: DbSession) -> dict:
     if db is None:
         return {"available": True}
-    result = await db.execute(select(Profile).where(Profile.nickname == nickname))
-    return {"available": result.scalar_one_or_none() is None}
+    try:
+        result = await db.execute(select(Profile).where(Profile.nickname == nickname))
+        return {"available": result.scalar_one_or_none() is None}
+    except Exception:
+        return {"available": True}
 
 
 @app.get("/api/auth/me", response_model=UserResponse)
@@ -194,14 +209,17 @@ async def auth_me(
     user_id = current_user.user_id
     profile = None
     if db is not None:
-        result = await db.execute(select(Profile).where(Profile.id == user_id))
-        profile = result.scalar_one_or_none()
-        await billing_service.async_load_to_memory(user_id, db)
+        try:
+            result = await db.execute(select(Profile).where(Profile.id == user_id))
+            profile = result.scalar_one_or_none()
+            await billing_service.async_load_to_memory(user_id, db)
+        except Exception:
+            profile = None
     status = billing_service.get_status(user_id)
     return UserResponse(
         email=current_user.email,
-        username=profile.username,  # type: ignore[arg-type]
-        nickname=profile.nickname,  # type: ignore[arg-type]
+        username=profile.username if profile else None,  # type: ignore[arg-type]
+        nickname=profile.nickname if profile else None,  # type: ignore[arg-type]
         plan_name=status.plan_name,
         credits_remaining=status.credits_remaining,
         subscription_status=status.subscription_status,
@@ -209,17 +227,46 @@ async def auth_me(
 
 
 @app.post("/api/billing/checkout", response_model=CheckoutResponse)
-async def billing_checkout(payload: CheckoutRequest) -> CheckoutResponse:
-    valid_codes = {
-        "starter_monthly", "student_plus_monthly", "pro_monthly",
-        "credit_pack_s", "credit_pack_m", "credit_pack_l",
-    }
-    if payload.product_code not in valid_codes:
-        raise HTTPException(status_code=400, detail="Unsupported product code.")
+async def billing_checkout(
+    payload: CheckoutRequest,
+    current_user=Depends(auth_service.get_current_user),
+) -> CheckoutResponse:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    try:
+        checkout_url = await billing_service.create_checkout_url(
+            payload.product_code,
+            customer_email=current_user.email,
+            user_id=current_user.user_id,
+            success_url=payload.success_url,
+        )
+    except PolarCheckoutConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PolarCheckoutUpstreamError as exc:
+        raise HTTPException(status_code=502, detail="Polar checkout 생성에 실패했습니다.") from exc
     return CheckoutResponse(
-        checkout_url=billing_service.create_checkout_url(payload.product_code),
+        checkout_url=checkout_url,
         message="Redirect the user to complete checkout.",
     )
+
+
+@app.post("/api/webhooks/polar")
+async def polar_webhook(request: Request, db: DbSession) -> Response:
+    payload = await request.body()
+    sig = request.headers.get("webhook-signature")
+    if not verify_webhook_signature(payload, sig):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature.")
+
+    event = json.loads(payload)
+    event_type: str = event.get("type", "")
+
+    if db is not None:
+        if event_type in ("subscription.created", "subscription.updated", "subscription.canceled"):
+            await handle_subscription_event(event, db)
+        elif event_type == "order.created":
+            await handle_order_event(event, db)
+
+    return Response(status_code=200)
 
 
 frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"

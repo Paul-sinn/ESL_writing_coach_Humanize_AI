@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import LandingPage from "./components/LandingPage";
+import PricingPage from "./components/PricingPage";
 
 const WORD_LIMIT = 1200;
 const FREE_WORD_LIMIT = 300;
@@ -157,11 +158,25 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("darkMode", darkMode);
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment_success") === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+      setPaymentSuccess(true);
+      if (user) {
+        fetchJson("/api/billing/status").then(setBilling).catch(() => null);
+      }
+    }
+  }, [user]);
 
   const resultRef = useRef(null);
   const humanizeResultRef = useRef(null);
@@ -212,6 +227,10 @@ export default function App() {
   const canSubmit = text.trim() && !overLimit && !loading && !humanizeLoading;
 
   useEffect(() => {
+    if (!user) {
+      setBilling(null);
+      return;
+    }
     fetchJson("/api/billing/status")
       .then(setBilling)
       .catch(() => setBilling(null));
@@ -278,15 +297,31 @@ export default function App() {
   }
 
   async function startCheckout(productCode) {
+    if (!user) {
+      setError("결제를 진행하려면 먼저 로그인해주세요.");
+      openAuth("login");
+      return false;
+    }
+    setCheckoutLoading(productCode);
     try {
       const data = await fetchJson("/api/billing/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_code: productCode }),
+        body: JSON.stringify({
+          product_code: productCode,
+          success_url: `${window.location.origin}/?payment_success=1`,
+        }),
       });
-      window.open(data.checkout_url, "_blank", "noopener,noreferrer");
+      if (!data?.checkout_url) {
+        throw new Error("결제 페이지 URL을 받지 못했습니다.");
+      }
+      window.location.href = data.checkout_url;
+      return true;
     } catch (err) {
-      setError(err.message);
+      console.error("[Checkout] API error:", err);
+      setError(err.message ?? "결제 페이지 이동에 실패했습니다.");
+      return false;
+    } finally {
+      setCheckoutLoading(null);
     }
   }
 
@@ -390,7 +425,7 @@ export default function App() {
               ⚡ {billing.credits_remaining.toLocaleString()} cr
             </div>
           )}
-          <button className="topnav-cta" onClick={() => setShowUpgradeModal(true)}>
+          <button className="topnav-cta" onClick={() => setShowPricing(true)}>
             Upgrade
           </button>
           <div className="profile-menu-wrap" ref={profileMenuRef}>
@@ -475,6 +510,24 @@ export default function App() {
           </div>
         </nav>
       </header>
+
+      {/* ── Payment success banner ── */}
+      {paymentSuccess && (
+        <div className="payment-success-banner" onClick={() => setPaymentSuccess(false)}>
+          결제가 완료되었습니다! 플랜이 업그레이드되었어요. ✓
+          <span className="payment-success-dismiss">✕</span>
+        </div>
+      )}
+
+      {/* ── Pricing page ── */}
+      {showPricing && (
+        <PricingPage
+          onClose={() => setShowPricing(false)}
+          onCheckout={async (code) => { const ok = await startCheckout(code); if (ok) setShowPricing(false); }}
+          currentStatus={billing?.subscription_status}
+          loading={checkoutLoading}
+        />
+      )}
 
       {/* ── Humanize modal ── */}
       {showHumanizeModal && (
@@ -693,7 +746,7 @@ export default function App() {
       {!showEditor && (
         <LandingPage
           onStart={() => setShowEditor(true)}
-          onUpgrade={() => setShowUpgradeModal(true)}
+          onUpgrade={() => setShowPricing(true)}
         />
       )}
 

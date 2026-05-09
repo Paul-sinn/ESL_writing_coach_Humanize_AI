@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+import httpx
+
 from ..config import get_settings
 from ..schemas import BillingRedirect, BillingStatusResponse, CheckoutOption
 
@@ -21,6 +23,17 @@ class UserAccount:
     user_id: str
     subscription_status: str
     credits_remaining: int
+
+
+class PolarCheckoutConfigError(ValueError):
+    pass
+
+
+class PolarCheckoutUpstreamError(RuntimeError):
+    def __init__(self, detail: str, status_code: int | None = None) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = status_code
 
 
 settings = get_settings()
@@ -84,6 +97,16 @@ _MONTHLY_CREDIT_LIMITS = {
     "pro": settings.pro_monthly_credits,
 }
 
+def _polar_product_ids() -> dict[str, str]:
+    return {
+        "starter_monthly": settings.polar_product_id_starter,
+        "student_plus_monthly": settings.polar_product_id_student_plus,
+        "pro_monthly": settings.polar_product_id_pro,
+        "credit_pack_s": settings.polar_product_id_credit_s,
+        "credit_pack_m": settings.polar_product_id_credit_m,
+        "credit_pack_l": settings.polar_product_id_credit_l,
+    }
+
 
 class BillingService:
     def __init__(self) -> None:
@@ -133,8 +156,62 @@ class BillingService:
             checkout_options=CHECKOUT_OPTIONS,
         )
 
-    def create_checkout_url(self, product_code: str) -> str:
-        return f"https://billing.example.com/checkout/{product_code}"
+    async def create_checkout_url(
+        self,
+        product_code: str,
+        *,
+        customer_email: str | None = None,
+        user_id: str | None = None,
+        success_url: str | None = None,
+    ) -> str:
+        product_id = _polar_product_ids().get(product_code)
+        if product_id is None:
+            raise PolarCheckoutConfigError("Unsupported product code.")
+        if not product_id:
+            raise PolarCheckoutConfigError(f"Polar product ID is not configured for {product_code}.")
+        if not settings.polar_access_token:
+            raise PolarCheckoutConfigError("Polar access token is not configured.")
+
+        body: dict[str, object] = {"products": [product_id]}
+        if success_url:
+            body["success_url"] = success_url
+        if customer_email:
+            body["customer_email"] = customer_email
+        if user_id:
+            body["external_customer_id"] = user_id
+            body["metadata"] = {"user_id": user_id}
+
+        endpoint = f"{settings.polar_api_base_url.rstrip('/')}/v1/checkouts/"
+        headers = {
+            "Authorization": f"Bearer {settings.polar_access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "pj-1-humanize-app/0.1 server-checkout",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(endpoint, json=body, headers=headers)
+        except httpx.RequestError as exc:
+            detail = str(exc)
+            print(f"Polar checkout request failed: {detail}")
+            raise PolarCheckoutUpstreamError(detail) from exc
+
+        if response.status_code >= 400:
+            detail = response.text
+            print(f"Polar checkout failed ({response.status_code}): {detail}")
+            raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            detail = response.text
+            print(f"Polar checkout returned invalid JSON: {detail}")
+            raise PolarCheckoutUpstreamError("Polar checkout response was not valid JSON.") from exc
+
+        checkout_url = payload.get("url") or payload.get("checkout_url")
+        if not isinstance(checkout_url, str) or not checkout_url:
+            raise PolarCheckoutUpstreamError("Polar checkout response did not include a checkout URL.")
+        return checkout_url
 
     # ── Async DB methods (real users only) ────────────────────────────────────
 

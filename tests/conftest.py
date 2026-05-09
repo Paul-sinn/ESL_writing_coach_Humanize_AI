@@ -9,6 +9,10 @@ TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 def reset_services():
     billing_service._accounts = {
         TEST_USER_ID: UserAccount(TEST_USER_ID, "free", 0),
+        "demo-free": UserAccount("demo-free", "free", 0),
+        "demo-starter": UserAccount("demo-starter", "starter", 20000),
+        "demo-plus": UserAccount("demo-plus", "student_plus", 60000),
+        "demo-pro": UserAccount("demo-pro", "pro", 150000),
     }
     rate_limit_service._attempts.clear()
     yield

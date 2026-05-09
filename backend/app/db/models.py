@@ -38,6 +38,7 @@ class UserAccountDB(Base):
     credits_remaining = Column(BigInteger, nullable=False, default=0)
     plan_name = Column(String(50), nullable=False, default="Free")
     monthly_credit_limit = Column(BigInteger, nullable=False, default=0)
+    polar_subscription_id = Column(String(100), nullable=True, index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     profile = relationship("Profile", back_populates="account")

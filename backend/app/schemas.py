@@ -123,6 +123,7 @@ class CheckoutRequest(BaseModel):
         "credit_pack_m",
         "credit_pack_l",
     ]
+    success_url: str | None = None
 
 
 class CheckoutResponse(BaseModel):
