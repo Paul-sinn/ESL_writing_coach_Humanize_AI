@@ -2,7 +2,12 @@ import asyncio
 
 import httpx
 import pytest
-from backend.app.services.billing import BillingService, PolarCheckoutConfigError, PolarCheckoutUpstreamError
+from backend.app.services.billing import (
+    BillingService,
+    PolarCheckoutConfigError,
+    PolarCheckoutUpstreamError,
+    _is_safe_customer_email,
+)
 
 
 @pytest.fixture
@@ -136,7 +141,7 @@ def test_create_checkout_url_calls_polar(monkeypatch, service):
     url = asyncio.run(
         service.create_checkout_url(
             "student_plus_monthly",
-            customer_email="student@example.com",
+            customer_email="student@gmail.com",
             user_id="00000000-0000-0000-0000-000000000001",
             success_url="http://localhost:5173/?payment_success=1",
         )
@@ -148,10 +153,57 @@ def test_create_checkout_url_calls_polar(monkeypatch, service):
     assert captured["body"] == {
         "products": ["product-plus"],
         "success_url": "http://localhost:5173/?payment_success=1",
-        "customer_email": "student@example.com",
+        "customer_email": "student@gmail.com",
         "external_customer_id": "00000000-0000-0000-0000-000000000001",
         "metadata": {"user_id": "00000000-0000-0000-0000-000000000001"},
     }
+
+
+def test_create_checkout_url_omits_reserved_demo_email(monkeypatch, service):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 201
+        text = "{}"
+
+        def json(self):
+            return {"url": "https://polar.sh/checkout/test"}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json, headers):
+            captured["body"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_access_token", "polar-token")
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_product_id_student_plus", "product-plus")
+    monkeypatch.setattr("backend.app.services.billing.httpx.AsyncClient", FakeAsyncClient)
+
+    asyncio.run(
+        service.create_checkout_url(
+            "student_plus_monthly",
+            customer_email="demo@student.test",
+            user_id="demo-plus",
+        )
+    )
+
+    assert "customer_email" not in captured["body"]
+    assert captured["body"]["external_customer_id"] == "demo-plus"
+
+
+def test_reserved_email_domains_are_not_sent_to_polar():
+    assert _is_safe_customer_email("student@gmail.com")
+    assert not _is_safe_customer_email("demo@student.test")
+    assert not _is_safe_customer_email("demo@example.com")
+    assert not _is_safe_customer_email("not-an-email")
 
 
 def test_create_checkout_url_rejects_unsupported_product(service):

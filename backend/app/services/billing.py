@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from email.utils import parseaddr
 
 import httpx
 
@@ -37,6 +38,14 @@ class PolarCheckoutUpstreamError(RuntimeError):
 
 
 settings = get_settings()
+_RESERVED_EMAIL_DOMAINS = {
+    "example.com",
+    "example.net",
+    "example.org",
+    "invalid",
+    "localhost",
+    "test",
+}
 
 CHECKOUT_OPTIONS = [
     CheckoutOption(
@@ -108,6 +117,17 @@ def _polar_product_ids() -> dict[str, str]:
     }
 
 
+def _is_safe_customer_email(email: str | None) -> bool:
+    if not email:
+        return False
+    _, parsed = parseaddr(email)
+    if parsed != email or "@" not in parsed:
+        return False
+    domain = parsed.rsplit("@", 1)[1].lower()
+    suffix = domain.rsplit(".", 1)[-1]
+    return domain not in _RESERVED_EMAIL_DOMAINS and suffix not in _RESERVED_EMAIL_DOMAINS
+
+
 class BillingService:
     def __init__(self) -> None:
         self._accounts: dict[str, UserAccount] = {
@@ -175,7 +195,7 @@ class BillingService:
         body: dict[str, object] = {"products": [product_id]}
         if success_url:
             body["success_url"] = success_url
-        if customer_email:
+        if _is_safe_customer_email(customer_email):
             body["customer_email"] = customer_email
         if user_id:
             body["external_customer_id"] = user_id
