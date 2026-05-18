@@ -37,6 +37,42 @@ def create_access_token(data: dict) -> str:
     return pyjwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
+def create_demo_access_token(email: str) -> str:
+    return create_access_token(
+        {
+            "sub": settings.demo_login_user_id,
+            "email": email,
+            "username": "demo",
+            "nickname": "Demo Student",
+            "demo": True,
+        }
+    )
+
+
+def verify_demo_credentials(email: str, password: str) -> bool:
+    return (
+        settings.demo_login_enabled
+        and email.strip().lower() == settings.demo_login_email.lower()
+        and password == settings.demo_login_password
+    )
+
+
+def _decode_local_app_token(token: str) -> dict | None:
+    if not settings.demo_login_enabled:
+        return None
+    try:
+        payload = pyjwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except pyjwt.PyJWTError:
+        return None
+    if payload.get("demo") is not True:
+        return None
+    return payload
+
+
 async def register(email: str, username: str, nickname: str, password: str, db) -> str:
     existing_email = await db.execute(select(Profile).where(Profile.username == email))
     if existing_email.scalar_one_or_none() is not None:
@@ -96,6 +132,7 @@ async def get_current_user(
     if not credentials:
         return None
     token = credentials.credentials
+    auth_error: Exception | None = None
     try:
         jwks = _get_jwks_client()
         if jwks:
@@ -121,5 +158,14 @@ async def get_current_user(
         if not user_id:
             return None
         return AuthUser(user_id=user_id, email=email)
-    except (pyjwt.PyJWTError, PyJWKClientConnectionError):
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    except (pyjwt.PyJWTError, PyJWKClientConnectionError) as exc:
+        auth_error = exc
+
+    payload = _decode_local_app_token(token)
+    if payload:
+        user_id = payload.get("sub")
+        email = payload.get("email", "")
+        if user_id:
+            return AuthUser(user_id=user_id, email=email)
+
+    raise HTTPException(status_code=401, detail="Invalid or expired token.") from auth_error

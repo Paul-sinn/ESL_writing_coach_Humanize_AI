@@ -131,6 +131,20 @@ class CheckoutResponse(BaseModel):
     message: str
 
 
+class DemoLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class DemoLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    email: str
+    user_id: str
+    username: str
+    nickname: str
+
+
 class UserResponse(BaseModel):
     email: str
     username: str | None = None

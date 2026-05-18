@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expire_minutes: int = Field(default=60 * 24, alias="JWT_EXPIRE_MINUTES")
 
+    demo_login_enabled: bool = Field(default=False, alias="DEMO_LOGIN_ENABLED")
+    demo_login_email: str = Field(default="demo@student.test", alias="DEMO_LOGIN_EMAIL")
+    demo_login_password: str = Field(default="demo1234", alias="DEMO_LOGIN_PASSWORD")
+    demo_login_user_id: str = Field(default="demo-plus", alias="DEMO_LOGIN_USER_ID")
+
     # Polar payment integration
     polar_api_base_url: str = Field(default="https://api.polar.sh", alias="POLAR_API_BASE_URL")
     polar_access_token: str = Field(default="", alias="POLAR_ACCESS_TOKEN")

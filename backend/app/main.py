@@ -21,6 +21,8 @@ from .schemas import (
     CheckoutResponse,
     CoachRequest,
     CoachResponse,
+    DemoLoginRequest,
+    DemoLoginResponse,
     HumanizeRequest,
     HumanizeResponse,
     UserResponse,
@@ -197,6 +199,19 @@ async def check_nickname(nickname: str, db: DbSession) -> dict:
         return {"available": result.scalar_one_or_none() is None}
     except Exception:
         return {"available": True}
+
+
+@app.post("/api/auth/demo-login", response_model=DemoLoginResponse)
+async def demo_login(payload: DemoLoginRequest) -> DemoLoginResponse:
+    if not auth_service.verify_demo_credentials(payload.email, payload.password):
+        raise HTTPException(status_code=401, detail="Invalid demo credentials.")
+    return DemoLoginResponse(
+        access_token=auth_service.create_demo_access_token(payload.email),
+        email=payload.email,
+        user_id=settings.demo_login_user_id,
+        username="demo",
+        nickname="Demo Student",
+    )
 
 
 @app.get("/api/auth/me", response_model=UserResponse)

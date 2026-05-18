@@ -10,11 +10,14 @@ from jose import jwt
 from backend.app.config import get_settings
 from backend.app.services.auth import (
     _verified_emails,
+    create_demo_access_token,
     create_access_token,
+    get_current_user,
     hash_password,
     register,
     login,
     verify_password,
+    verify_demo_credentials,
 )
 
 settings = get_settings()
@@ -158,4 +161,29 @@ def test_login_nonexistent_user_raises_401():
         asyncio.run(login("nobody@test.com", "anypass", db))
     assert exc.value.status_code == 401
 
+
+def test_demo_credentials_disabled_by_default(monkeypatch):
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_enabled", False)
+
+    assert not verify_demo_credentials("demo@student.test", "demo1234")
+
+
+def test_demo_credentials_match_when_enabled(monkeypatch):
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_enabled", True)
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_email", "demo@student.test")
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_password", "demo1234")
+
+    assert verify_demo_credentials("DEMO@student.test", "demo1234")
+    assert not verify_demo_credentials("demo@student.test", "wrong")
+
+
+def test_demo_token_authenticates_when_enabled(monkeypatch):
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_enabled", True)
+    monkeypatch.setattr("backend.app.services.auth.settings.demo_login_user_id", "demo-plus")
+
+    token = create_demo_access_token("demo@student.test")
+    user = asyncio.run(get_current_user(credentials=MagicMock(credentials=token)))
+
+    assert user.user_id == "demo-plus"
+    assert user.email == "demo@student.test"
 

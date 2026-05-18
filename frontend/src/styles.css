@@ -2217,6 +2217,40 @@ button:disabled {
   background: var(--surface-raised);
   border-color: var(--accent);
 }
+
+.auth-demo-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 16px;
+  border: 1.5px solid rgba(18, 151, 116, 0.35);
+  border-radius: 8px;
+  background: rgba(18, 151, 116, 0.1);
+  color: #0f766e;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, transform 120ms;
+}
+
+.auth-demo-btn:hover:not(:disabled) {
+  background: rgba(18, 151, 116, 0.16);
+  border-color: rgba(18, 151, 116, 0.55);
+  transform: translateY(-1px);
+}
+
+.auth-demo-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.auth-demo-hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
