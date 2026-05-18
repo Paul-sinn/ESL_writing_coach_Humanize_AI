@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +39,14 @@ from .utils.text import count_words
 
 
 settings = get_settings()
+
+
+def _uses_persistent_billing(user_id: str) -> bool:
+    try:
+        UUID(user_id)
+    except ValueError:
+        return False
+    return True
 
 
 @asynccontextmanager
@@ -84,7 +93,7 @@ async def coach(
     user_id = current_user.user_id
     reserved_ledger_id: int | None = None
 
-    if db is not None:
+    if db is not None and _uses_persistent_billing(user_id):
         await billing_service.async_load_to_memory(user_id, db)
         status = billing_service.get_status(user_id)
         if status.subscription_status != "free":
@@ -127,7 +136,7 @@ async def humanize(
     user_id = current_user.user_id
     reserved_ledger_id: int | None = None
 
-    if db is not None:
+    if db is not None and _uses_persistent_billing(user_id):
         await billing_service.async_load_to_memory(user_id, db)
         status = billing_service.get_status(user_id)
         if status.subscription_status != "free":
@@ -171,7 +180,7 @@ async def billing_status(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required.")
     user_id = current_user.user_id
-    if db is not None:
+    if db is not None and _uses_persistent_billing(user_id):
         try:
             await billing_service.async_load_to_memory(user_id, db)
         except Exception:
@@ -223,7 +232,7 @@ async def auth_me(
         raise HTTPException(status_code=401, detail="Authentication required.")
     user_id = current_user.user_id
     profile = None
-    if db is not None:
+    if db is not None and _uses_persistent_billing(user_id):
         try:
             result = await db.execute(select(Profile).where(Profile.id == user_id))
             profile = result.scalar_one_or_none()
