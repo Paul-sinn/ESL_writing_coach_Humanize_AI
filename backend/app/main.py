@@ -253,10 +253,16 @@ async def auth_me(
 @app.post("/api/billing/checkout", response_model=CheckoutResponse)
 async def billing_checkout(
     payload: CheckoutRequest,
+    db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> CheckoutResponse:
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required.")
+    if _uses_persistent_billing(current_user.user_id):
+        if db is None:
+            raise HTTPException(status_code=503, detail="Billing database is unavailable.")
+        await billing_service.async_get_or_create_db_account(current_user.user_id, db)
+        await db.commit()
     try:
         checkout_url = await billing_service.create_checkout_url(
             payload.product_code,
@@ -277,17 +283,23 @@ async def billing_checkout(
 @app.post("/api/webhooks/polar")
 async def polar_webhook(request: Request, db: DbSession) -> Response:
     payload = await request.body()
-    sig = request.headers.get("webhook-signature")
-    if not verify_webhook_signature(payload, sig):
+    if not verify_webhook_signature(payload, request.headers):
         raise HTTPException(status_code=403, detail="Invalid webhook signature.")
 
     event = json.loads(payload)
     event_type: str = event.get("type", "")
 
     if db is not None:
-        if event_type in ("subscription.created", "subscription.updated", "subscription.canceled"):
+        if event_type in (
+            "subscription.created",
+            "subscription.active",
+            "subscription.updated",
+            "subscription.uncanceled",
+            "subscription.canceled",
+            "subscription.revoked",
+        ):
             await handle_subscription_event(event, db)
-        elif event_type == "order.created":
+        elif event_type in ("order.paid", "order.updated"):
             await handle_order_event(event, db)
 
     return Response(status_code=200)
