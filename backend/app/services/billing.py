@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from email.utils import parseaddr
 
 import httpx
@@ -13,6 +14,8 @@ try:
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession
     from ..db.models import CreditLedgerDB as _CreditLedgerDBModel
+    from ..db.models import SubscriptionDB as _SubscriptionDBModel
+    from ..db.models import UsageDB as _UsageDBModel
     from ..db.models import UserAccountDB as _UserAccountDBModel
     _DB_AVAILABLE = True
 except Exception:
@@ -106,6 +109,11 @@ _MONTHLY_CREDIT_LIMITS = {
     "pro": settings.pro_monthly_credits,
 }
 
+
+def _current_period_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
 def _polar_product_ids() -> dict[str, str]:
     return {
         "starter_monthly": settings.polar_product_id_starter,
@@ -142,11 +150,17 @@ class BillingService:
 
     def get_status(self, user_id: str) -> BillingStatusResponse:
         account = self.get_or_create_account(user_id)
+        monthly_limit = _MONTHLY_CREDIT_LIMITS.get(account.subscription_status, 0)
+        usage_used = max(0, monthly_limit - account.credits_remaining) if monthly_limit > 0 else 0
+        usage_percent = min(100, round((usage_used / monthly_limit) * 100)) if monthly_limit > 0 else 0
         return BillingStatusResponse(
             subscription_status=account.subscription_status,  # type: ignore[arg-type]
             credits_remaining=account.credits_remaining,
             plan_name=_PLAN_NAMES.get(account.subscription_status, "Free"),
-            monthly_credit_limit=_MONTHLY_CREDIT_LIMITS.get(account.subscription_status, 0),
+            monthly_credit_limit=monthly_limit,
+            usage_used=usage_used,
+            usage_limit=monthly_limit,
+            usage_percent=usage_percent,
             available_credit_packs=CHECKOUT_OPTIONS,
         )
 
@@ -251,7 +265,80 @@ class BillingService:
             )
             db.add(account)
             await db.flush()
+        sub_result = await db.execute(
+            select(_SubscriptionDBModel).where(_SubscriptionDBModel.user_id == uid)
+        )
+        subscription = sub_result.scalar_one_or_none()
+        if subscription is None:
+            db.add(_SubscriptionDBModel(
+                user_id=uid,
+                subscription_status=account.subscription_status,
+                plan_name=account.plan_name,
+                monthly_credit_limit=account.monthly_credit_limit,
+                polar_subscription_id=account.polar_subscription_id,
+            ))
+            await db.flush()
         return account
+
+    async def async_sync_subscription(
+        self,
+        user_id: str,
+        *,
+        subscription_status: str,
+        plan_name: str,
+        monthly_credit_limit: int,
+        polar_subscription_id: str | None,
+        db: "AsyncSession",
+    ) -> None:
+        uid = uuid.UUID(user_id)
+        result = await db.execute(
+            select(_SubscriptionDBModel).where(_SubscriptionDBModel.user_id == uid)
+        )
+        subscription = result.scalar_one_or_none()
+        if subscription is None:
+            subscription = _SubscriptionDBModel(user_id=uid)
+            db.add(subscription)
+        subscription.subscription_status = subscription_status
+        subscription.plan_name = plan_name
+        subscription.monthly_credit_limit = monthly_credit_limit
+        subscription.polar_subscription_id = polar_subscription_id
+
+    async def async_record_usage(
+        self,
+        user_id: str,
+        *,
+        feature: str,
+        words: int,
+        credits_used: int,
+        db: "AsyncSession",
+    ) -> None:
+        account = await self.async_get_or_create_db_account(user_id, db)
+        if account.subscription_status == "unlimited" or account.monthly_credit_limit < 0:
+            return
+
+        uid = uuid.UUID(user_id)
+        period_key = _current_period_key()
+        result = await db.execute(
+            select(_UsageDBModel).where(
+                _UsageDBModel.user_id == uid,
+                _UsageDBModel.period_key == period_key,
+                _UsageDBModel.feature == feature,
+            )
+        )
+        usage = result.scalar_one_or_none()
+        if usage is None:
+            usage = _UsageDBModel(
+                user_id=uid,
+                period_key=period_key,
+                feature=feature,
+                request_count=0,
+                word_count=0,
+                credits_used=0,
+            )
+            db.add(usage)
+        usage.request_count += 1
+        usage.word_count += max(0, words)
+        usage.credits_used += max(0, credits_used)
 
     async def async_load_to_memory(self, user_id: str, db: "AsyncSession") -> None:
         """Sync real user's DB credits into in-memory dict so graph nodes can read them."""

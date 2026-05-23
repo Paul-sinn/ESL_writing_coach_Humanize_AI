@@ -49,6 +49,18 @@ def _uses_persistent_billing(user_id: str) -> bool:
     return True
 
 
+def _billing_limit_detail(response: CoachResponse | HumanizeResponse) -> dict | None:
+    redirect = response.billing_redirect
+    if redirect is None:
+        return None
+    return {
+        "message": redirect.message,
+        "recommended_offer": redirect.recommended_offer,
+        "upgrade_url": redirect.route,
+        "checkout_options": [option.model_dump() for option in redirect.checkout_options],
+    }
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -115,6 +127,22 @@ async def coach(
                 await billing_service.async_release_reservation(reserved_ledger_id, db)
             else:
                 await billing_service.async_capture_reservation(reserved_ledger_id, db)
+                await billing_service.async_record_usage(
+                    user_id,
+                    feature="coach",
+                    words=response.input_word_count,
+                    credits_used=response.credits_charged,
+                    db=db,
+                )
+            await db.commit()
+        elif db is not None and _uses_persistent_billing(user_id) and not response.billing_redirect:
+            await billing_service.async_record_usage(
+                user_id,
+                feature="coach",
+                words=response.input_word_count,
+                credits_used=response.credits_charged,
+                db=db,
+            )
             await db.commit()
     except Exception:
         if reserved_ledger_id is not None and db is not None:
@@ -122,6 +150,9 @@ async def coach(
             await db.commit()
         raise
 
+    limit_detail = _billing_limit_detail(response)
+    if limit_detail is not None:
+        raise HTTPException(status_code=429, detail=limit_detail)
     return response
 
 
@@ -162,6 +193,22 @@ async def humanize(
                 await billing_service.async_release_reservation(reserved_ledger_id, db)
             else:
                 await billing_service.async_capture_reservation(reserved_ledger_id, db)
+                await billing_service.async_record_usage(
+                    user_id,
+                    feature="humanize",
+                    words=response.input_word_count,
+                    credits_used=response.credits_charged,
+                    db=db,
+                )
+            await db.commit()
+        elif db is not None and _uses_persistent_billing(user_id) and not response.billing_redirect:
+            await billing_service.async_record_usage(
+                user_id,
+                feature="humanize",
+                words=response.input_word_count,
+                credits_used=response.credits_charged,
+                db=db,
+            )
             await db.commit()
     except Exception:
         if reserved_ledger_id is not None and db is not None:
@@ -169,6 +216,9 @@ async def humanize(
             await db.commit()
         raise
 
+    limit_detail = _billing_limit_detail(response)
+    if limit_detail is not None:
+        raise HTTPException(status_code=429, detail=limit_detail)
     return response
 
 
@@ -306,8 +356,9 @@ async def polar_webhook(request: Request, db: DbSession) -> Response:
 
 
 frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+frontend_assets = frontend_dist / "assets"
+if frontend_dist.exists() and frontend_assets.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_assets), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str) -> FileResponse:

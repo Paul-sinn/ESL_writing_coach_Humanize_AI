@@ -83,7 +83,14 @@ async function fetchJson(path, options = {}) {
     throw new Error(`API returned a non-JSON response. Check that the backend is running on port 8000.`);
   }
   if (!response.ok) {
-    throw new Error(data?.detail || data?.message || `Request failed for ${path}.`);
+    const detail = data?.detail;
+    const message = typeof detail === "string"
+      ? detail
+      : detail?.message || data?.message || `Request failed for ${path}.`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.detail = detail;
+    throw error;
   }
   return data;
 }
@@ -162,6 +169,8 @@ export default function App() {
   const [showPricing, setShowPricing] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [showLimitCta, setShowLimitCta] = useState(false);
+  const [limitNotice, setLimitNotice] = useState(null);
 
   useEffect(() => {
     localStorage.setItem("darkMode", darkMode);
@@ -218,6 +227,13 @@ export default function App() {
   const overLimit = wordCount > WORD_LIMIT;
   const isFreePlan = billing?.subscription_status === "free";
   const freeLimitWarning = isFreePlan && wordCount > FREE_WORD_LIMIT;
+  const usageLimit = billing?.usage_limit ?? billing?.monthly_credit_limit ?? 0;
+  const usageUsed = billing?.usage_used ?? Math.max(0, usageLimit - (billing?.credits_remaining ?? 0));
+  const usagePercent = usageLimit > 0
+    ? Math.min(100, billing?.usage_percent ?? Math.round((usageUsed / usageLimit) * 100))
+    : 0;
+  const usageWarning = !isFreePlan && usageLimit > 0 && usagePercent >= 80 && usagePercent < 100;
+  const usageExhausted = !isFreePlan && usageLimit > 0 && usagePercent >= 100;
 
   const selectedDepth = DEPTH_OPTIONS.find((d) => d.value === depth);
   const feedbackCost = isFreePlan ? 0 : Math.max(
@@ -236,6 +252,15 @@ export default function App() {
       .then(setBilling)
       .catch(() => setBilling(null));
   }, [user]);
+
+  useEffect(() => {
+    if (!usageExhausted) return;
+    setLimitNotice({
+      message: "You've used this month's included credits.",
+      recommended_offer: "Upgrade your plan or add a credit pack to keep working.",
+    });
+    setShowLimitCta(true);
+  }, [usageExhausted]);
 
   // Protect editor: redirect to landing + open auth modal when not logged in
   useEffect(() => {
@@ -261,6 +286,10 @@ export default function App() {
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
     } catch (err) {
+      if (err.status === 429 && err.detail) {
+        setLimitNotice(err.detail);
+        setShowLimitCta(true);
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -291,6 +320,10 @@ export default function App() {
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
     } catch (err) {
+      if (err.status === 429 && err.detail) {
+        setLimitNotice(err.detail);
+        setShowLimitCta(true);
+      }
       setError(err.message);
     } finally {
       setHumanizeLoading(false);
@@ -560,6 +593,20 @@ export default function App() {
         />
       )}
 
+      {showLimitCta && (
+        <div className="usage-limit-overlay" onClick={() => setShowLimitCta(false)}>
+          <div className="usage-limit-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="auth-modal-close" onClick={() => setShowLimitCta(false)}>✕</button>
+            <div className="eyebrow">Usage limit</div>
+            <h3>{limitNotice?.message || "You reached your usage limit."}</h3>
+            <p>{limitNotice?.recommended_offer || "Upgrade your plan or add credits to continue."}</p>
+            <button className="topnav-cta" onClick={() => { setShowLimitCta(false); setShowPricing(true); }}>
+              Upgrade
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Humanize modal ── */}
       {showHumanizeModal && (
         <div className="humanize-modal-overlay" onClick={() => setShowHumanizeModal(false)}>
@@ -798,6 +845,23 @@ export default function App() {
         <main className="workspace">
 
           <section className="editor-card">
+            {billing && !isFreePlan && (
+              <div className={`usage-panel${usageWarning ? " usage-panel-warning" : ""}${usageExhausted ? " usage-panel-exhausted" : ""}`}>
+                <div className="usage-panel-head">
+                  <div>
+                    <div className="eyebrow">Monthly usage</div>
+                    <strong>{usageUsed.toLocaleString()} / {usageLimit.toLocaleString()} credits</strong>
+                  </div>
+                  <span>{usagePercent}%</span>
+                </div>
+                <div className="usage-progress">
+                  <div style={{ width: `${usagePercent}%` }} />
+                </div>
+                {usageWarning && (
+                  <div className="usage-warning">You're near this month's included credit limit.</div>
+                )}
+              </div>
+            )}
             <div className="editor-toolbar">
               <div>
                 <div className="eyebrow">Workspace</div>

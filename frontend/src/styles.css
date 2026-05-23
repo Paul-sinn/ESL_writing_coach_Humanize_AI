@@ -2987,3 +2987,100 @@ button:disabled {
   color: var(--muted);
   margin: 20px 0 0;
 }
+
+.usage-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 18px;
+  background: var(--bg);
+}
+
+.usage-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  color: var(--ink);
+}
+
+.usage-panel-head strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.95rem;
+}
+
+.usage-panel-head span {
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.usage-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+  margin-top: 12px;
+}
+
+.usage-progress div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.usage-panel-warning {
+  border-color: #d97706;
+}
+
+.usage-panel-warning .usage-progress div {
+  background: #d97706;
+}
+
+.usage-panel-exhausted {
+  border-color: #dc2626;
+}
+
+.usage-panel-exhausted .usage-progress div {
+  background: #dc2626;
+}
+
+.usage-warning {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.usage-limit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.usage-limit-modal {
+  position: relative;
+  width: min(420px, 100%);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 26px;
+}
+
+.usage-limit-modal h3 {
+  margin: 6px 34px 8px 0;
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+
+.usage-limit-modal p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}

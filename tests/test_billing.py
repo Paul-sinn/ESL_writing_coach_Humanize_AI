@@ -49,6 +49,16 @@ def test_get_status_student_plus(service):
     assert status.subscription_status == "student_plus"
     assert status.plan_name == "Student Plus"
     assert status.monthly_credit_limit == 60000
+    assert status.usage_limit == 60000
+    assert status.usage_percent == 0
+
+
+def test_get_status_reports_monthly_usage_from_remaining_credits(service):
+    service._accounts["demo-plus"].credits_remaining = 30000
+    status = service.get_status("demo-plus")
+    assert status.usage_used == 30000
+    assert status.usage_limit == 60000
+    assert status.usage_percent == 50
 
 
 def test_get_status_includes_six_checkout_options(service):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -42,6 +42,36 @@ class UserAccountDB(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     profile = relationship("Profile", back_populates="account")
+
+
+class SubscriptionDB(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, unique=True)
+    subscription_status = Column(String(30), nullable=False, default="free")
+    plan_name = Column(String(50), nullable=False, default="Free")
+    monthly_credit_limit = Column(BigInteger, nullable=False, default=0)
+    polar_subscription_id = Column(String(100), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class UsageDB(Base):
+    __tablename__ = "usage"
+    __table_args__ = (
+        UniqueConstraint("user_id", "period_key", "feature", name="uq_usage_user_period_feature"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    period_key = Column(String(7), nullable=False, index=True)
+    feature = Column(String(30), nullable=False)
+    request_count = Column(BigInteger, nullable=False, default=0)
+    word_count = Column(BigInteger, nullable=False, default=0)
+    credits_used = Column(BigInteger, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
 
 class CreditLedgerDB(Base):

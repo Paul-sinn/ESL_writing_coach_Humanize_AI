@@ -111,6 +111,9 @@ class BillingStatusResponse(BaseModel):
     credits_remaining: int
     plan_name: str
     monthly_credit_limit: int
+    usage_used: int = 0
+    usage_limit: int = 0
+    usage_percent: int = 0
     available_credit_packs: list[CheckoutOption]
 
 

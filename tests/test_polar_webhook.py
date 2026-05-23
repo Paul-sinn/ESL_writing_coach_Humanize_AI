@@ -61,8 +61,15 @@ def test_subscription_event_uses_customer_external_id(monkeypatch):
         assert user_id == "00000000-0000-0000-0000-000000000001"
         return account
 
+    synced = {}
+
+    async def fake_sync_subscription(user_id, **kwargs):
+        synced["user_id"] = user_id
+        synced.update(kwargs)
+
     db.commit = fake_commit
     monkeypatch.setattr(polar_webhook, "_load_account", fake_load_account)
+    monkeypatch.setattr(polar_webhook.billing_service, "async_sync_subscription", fake_sync_subscription)
     monkeypatch.setattr(polar_webhook.settings, "polar_product_id_student_plus", "product-plus")
 
     import asyncio
@@ -86,6 +93,7 @@ def test_subscription_event_uses_customer_external_id(monkeypatch):
     assert account.monthly_credit_limit == 60000
     assert account.credits_remaining == 60000
     assert account.polar_subscription_id == "sub_123"
+    assert synced["subscription_status"] == "student_plus"
 
 
 def test_order_event_only_grants_paid_credit_pack(monkeypatch):

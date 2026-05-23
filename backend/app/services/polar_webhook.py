@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db.models import UserAccountDB
+from .billing import billing_service
 
 settings = get_settings()
 
@@ -144,11 +145,27 @@ async def handle_subscription_event(event: dict[str, Any], db: AsyncSession) -> 
         account.polar_subscription_id = polar_sub_id
         if account.credits_remaining < monthly_credits:
             account.credits_remaining = monthly_credits
+        await billing_service.async_sync_subscription(
+            user_id,
+            subscription_status=new_status,
+            plan_name=plan_name,
+            monthly_credit_limit=monthly_credits,
+            polar_subscription_id=polar_sub_id,
+            db=db,
+        )
     elif status in ("canceled", "revoked"):
         account.subscription_status = "free"
         account.plan_name = "Free"
         account.monthly_credit_limit = 0
         account.polar_subscription_id = None
+        await billing_service.async_sync_subscription(
+            user_id,
+            subscription_status="free",
+            plan_name="Free",
+            monthly_credit_limit=0,
+            polar_subscription_id=None,
+            db=db,
+        )
 
     await db.commit()
 
