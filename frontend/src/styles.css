@@ -12,7 +12,8 @@
   --warm: #a67e6f;
   --gold: #f2d5ce;
   --shadow: 0 18px 40px rgba(30, 49, 89, 0.1);
-  font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --font-sans: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-sans);
 }
 
 html.dark {
@@ -51,6 +52,7 @@ body {
     radial-gradient(circle at top left, rgba(138, 180, 216, 0.45), transparent 28%),
     linear-gradient(180deg, #fcf7f5 0%, #f2d5ce 100%);
   color: var(--ink);
+  font-family: var(--font-sans);
 }
 
 button,
@@ -63,38 +65,45 @@ textarea {
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  border-bottom: 1px solid rgba(93, 71, 46, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.topbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 14px 28px;
-  border-bottom: 1px solid rgba(93, 71, 46, 0.1);
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(14px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  width: min(100%, 1180px);
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 12px 27px;
 }
 
 .brand-lockup,
 .brand-home-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 .brand-home-btn {
   background: none;
   border: 0;
-  padding: 0;
-  border-radius: 0;
+  padding: 4px 8px 4px 2px;
+  border-radius: 14px;
   color: inherit;
   cursor: pointer;
 }
 
 .brand-home-btn:hover {
   transform: none;
-  opacity: 0.8;
+  background: rgba(138, 180, 216, 0.12);
+  opacity: 1;
 }
 
 .topnav-back {
@@ -102,32 +111,97 @@ textarea {
   padding: 8px 14px;
 }
 
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: var(--accent);
-  color: white;
-  font-weight: 700;
-  font-family: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
 
-.brand-name {
-  font-weight: 700;
+.brand-logo-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
-.brand-subtitle {
-  font-size: 0.88rem;
-  color: var(--muted);
+.brand-page,
+.brand-page-fold {
+  fill: none;
+  stroke: #061f43;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-line {
+  fill: none;
+  stroke: #1777ee;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+
+.brand-line.short {
+  stroke-width: 4.2;
+}
+
+.brand-pen {
+  fill: #1777ee;
+  stroke: #1777ee;
+  stroke-linejoin: round;
+}
+
+.brand-pen-stroke {
+  fill: none;
+  stroke: white;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.brand-pen-dot {
+  fill: white;
+}
+
+.brand-spark {
+  fill: #ff7a00;
+}
+
+.brand-spark-small {
+  transform: translate(2px, 0);
+}
+
+.brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #061f43;
+  font-size: clamp(1.08rem, 1.55vw, 1.3rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand-wordmark span:last-child {
+  color: #1777ee;
+}
+
+html.dark .brand-page,
+html.dark .brand-page-fold {
+  stroke: #e4e8f0;
+}
+
+html.dark .brand-wordmark {
+  color: #e4e8f0;
 }
 
 .topnav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  font-family: var(--font-sans);
 }
 
 .nav-link {
@@ -145,17 +219,54 @@ textarea {
 
 .topnav-cta {
   background: var(--accent);
+  min-height: 38px;
+  padding: 9px 16px;
+  box-shadow: 0 8px 18px rgba(30, 50, 89, 0.14);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 .nav-credits {
-  font-size: 13px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
   color: var(--muted);
   background: rgba(138, 180, 216, 0.1);
   border: 1px solid rgba(138, 180, 216, 0.2);
-  padding: 6px 12px;
+  padding: 0 12px;
   border-radius: 999px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-plan-name {
+  color: var(--accent);
+}
+
+.nav-credit-count {
+  position: relative;
+  color: var(--muted);
+  padding-left: 9px;
+}
+
+.nav-credit-count::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 14px;
+  background: currentColor;
+  opacity: 0.28;
+  transform: translateY(-50%);
 }
 
 .nav-credits-low {
@@ -172,8 +283,10 @@ textarea {
 
 .workspace {
   display: grid;
-  gap: 18px;
-  padding: 12px 12px 24px;
+  gap: 20px;
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: 27px 27px 40px;
   align-content: start;
 }
 
@@ -793,8 +906,9 @@ html.dark .landing-stat-card {
 }
 
 .editor-card {
-  padding: 20px 24px;
+  padding: clamp(18px, 2.4vw, 28px);
   border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(30, 49, 89, 0.1);
 }
 
 .balance-card {
@@ -818,26 +932,35 @@ html.dark .landing-stat-card {
 
 .editor-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.82fr);
+  gap: 18px;
   align-items: start;
 }
 
 .input-panel {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 textarea {
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #fffdfc;
   color: var(--ink);
-  padding: 14px;
+  min-height: 520px;
+  padding: 18px;
   resize: vertical;
   overflow-wrap: break-word;
   word-break: break-word;
+  line-height: 1.7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  outline: none;
+}
+
+textarea:focus {
+  border-color: rgba(36, 62, 115, 0.34);
+  box-shadow: 0 0 0 4px rgba(138, 180, 216, 0.16);
 }
 
 .word-counter {
@@ -899,14 +1022,16 @@ button:disabled {
 
 .requirements-card {
   margin-top: 0;
-  padding: 16px;
+  padding: 18px;
+  position: sticky;
+  top: 88px;
 }
 
 .requirements-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
 .paid-pill,
@@ -924,7 +1049,8 @@ button:disabled {
 }
 
 .result-card {
-  padding: 20px;
+  padding: clamp(18px, 2.4vw, 26px);
+  border-radius: 18px;
 }
 
 .result-header {
@@ -1064,6 +1190,9 @@ button:disabled {
   color: white;
   font-weight: 700;
   font-size: 0.9rem;
+  font-family: var(--font-sans);
+  line-height: 1;
+  letter-spacing: 0;
   padding: 0;
   display: grid;
   place-items: center;
@@ -1219,41 +1348,23 @@ button:disabled {
   align-items: start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
 
 .editor-toolbar h2 {
   margin: 8px 0 0;
-}
-
-.editor-balance {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.editor-plan-badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(138, 180, 216, 0.18);
-  color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.editor-credits {
-  font-size: 0.88rem;
-  color: var(--muted);
-  font-weight: 600;
+  font-size: clamp(1.45rem, 2.1vw, 2rem);
+  line-height: 1.12;
 }
 
 /* ── Dual action buttons ── */
 .dual-action-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .btn-feedback,
@@ -1262,6 +1373,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   gap: 3px;
+  min-height: 72px;
   padding: 14px 12px;
   border-radius: 16px;
   cursor: pointer;
@@ -1428,9 +1540,9 @@ button:disabled {
 /* ── Coaching selects ── */
 .coach-selects {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 14px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .select-group {
@@ -1453,6 +1565,7 @@ button:disabled {
   border-radius: 12px;
   background: #fffdfc;
   color: var(--ink);
+  min-height: 42px;
   padding: 9px 12px;
   font: inherit;
   font-size: 0.9rem;
@@ -1467,17 +1580,18 @@ button:disabled {
 /* ── Depth selector ── */
 .depth-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 14px;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .depth-btn {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
-  border-radius: 16px;
+  gap: 3px;
+  min-height: 74px;
+  padding: 12px 14px;
+  border-radius: 14px;
   background: rgba(138, 180, 216, 0.1);
   color: var(--ink);
   text-align: left;
@@ -1488,6 +1602,7 @@ button:disabled {
 .depth-btn.active {
   background: rgba(36, 62, 115, 0.08);
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(138, 180, 216, 0.12);
 }
 
 .depth-name {
@@ -1695,9 +1810,9 @@ button:disabled {
 /* ── Score grid ── */
 .score-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin: 16px 0;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 18px 0;
 }
 
 .score-card {
@@ -2495,18 +2610,32 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .topbar {
+  .topbar-inner {
     flex-wrap: wrap;
+    padding-inline: 16px;
+    gap: 12px;
   }
 
   .workspace {
-    padding: 8px 8px 20px;
+    padding: 20px 16px 28px;
   }
 
-  .score-grid,
+  .requirements-card {
+    position: static;
+  }
+
+  .editor-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .compare-grid,
   .dual-action-row {
     grid-template-columns: 1fr;
+  }
+
+  .score-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .hero-pricing-row {
@@ -2525,6 +2654,59 @@ button:disabled {
 
   .pricing-sheet {
     padding: 28px 16px 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-inner {
+    min-height: 62px;
+  }
+
+  .brand-logo {
+    gap: 7px;
+  }
+
+  .brand-logo-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-wordmark {
+    font-size: 1rem;
+  }
+
+  .topnav {
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .nav-credits {
+    display: none;
+  }
+
+  .topnav-cta {
+    min-height: 34px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+  }
+
+  .workspace {
+    padding: 14px 12px 24px;
+  }
+
+  .editor-card,
+  .result-card,
+  .requirements-card {
+    border-radius: 16px;
+  }
+
+  textarea {
+    min-height: 380px;
+    padding: 14px;
+  }
+
+  .score-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -26,7 +26,7 @@ const WRITING_LEVELS = [
 const DEPTH_OPTIONS = [
   { value: "basic", label: "Quick Check", costPerWord: 1, minCredits: 500, description: "Top 3 issues" },
   { value: "deep", label: "Deep Feedback", costPerWord: 2, minCredits: 1200, description: "Full analysis" },
-  { value: "full_review", label: "Full Review", costPerWord: 5, minCredits: 3000, description: "Everything + rewrites" },
+  { value: "full_review", label: "Full Review", costPerWord: 5, minCredits: 3000, description: "Full analysis + examples" },
 ];
 
 const TONE_OPTIONS = [
@@ -420,40 +420,55 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button
-          className="brand-lockup brand-home-btn"
-          onClick={() => setShowEditor(false)}
-          aria-label="Home"
-        >
-          <div className="brand-mark">WC</div>
-          <div>
-            <div className="brand-name">Writing Coach</div>
-            <div className="brand-subtitle">ESL Academic Writing Assistant</div>
-          </div>
-        </button>
-        <nav className="topnav">
-          {billing && !isFreePlan && (
-            <div className={`nav-credits ${
-              billing.credits_remaining < 1000 ? "nav-credits-critical" :
-              billing.credits_remaining < 5000 ? "nav-credits-low" : ""
-            }`}>
-              ⚡ {billing.credits_remaining.toLocaleString()} cr
+        <div className="topbar-inner">
+          <button
+            className="brand-lockup brand-home-btn"
+            onClick={() => setShowEditor(false)}
+            aria-label="Home"
+          >
+            <div className="brand-logo" aria-hidden="true">
+              <svg className="brand-logo-icon" viewBox="0 0 64 64" role="img">
+                <path className="brand-spark brand-spark-large" d="M11 5.5l2.1 6.1 6.1 2.1-6.1 2.1L11 21.9l-2.1-6.1-6.1-2.1 6.1-2.1L11 5.5z" />
+                <path className="brand-spark brand-spark-small" d="M4.7 20.4l1.4 4.2 4.2 1.4-4.2 1.4-1.4 4.2-1.4-4.2L-.9 26l4.2-1.4 1.4-4.2z" />
+                <path className="brand-page" d="M17 10h26l9 9v28a7 7 0 0 1-7 7H21l-9 8V17a7 7 0 0 1 7-7z" />
+                <path className="brand-page-fold" d="M43 10v10h9" />
+                <path className="brand-line" d="M23 25h16" />
+                <path className="brand-line" d="M23 34h16" />
+                <path className="brand-line short" d="M23 43h11" />
+                <path className="brand-pen" d="M36 39l23-7-7 23-18 5 5-18z" />
+                <path className="brand-pen-stroke" d="M35 59l16-16" />
+                <circle className="brand-pen-dot" cx="50" cy="42" r="3" />
+              </svg>
+              <span className="brand-wordmark">
+                <span>EssayCoach</span>
+                <span>AI</span>
+              </span>
             </div>
-          )}
-          <button className="topnav-cta" onClick={() => setShowPricing(true)}>
-            Upgrade
           </button>
-          <div className="profile-menu-wrap" ref={profileMenuRef}>
-            <button
-              className="profile-avatar-btn"
-              onClick={() => setProfileOpen(o => !o)}
-              aria-label="Profile"
-            >
-              <span>{planInitial}</span>
+          <nav className="topnav">
+            {billing && !isFreePlan && (
+              <div className={`nav-credits ${
+                billing.credits_remaining < 1000 ? "nav-credits-critical" :
+                billing.credits_remaining < 5000 ? "nav-credits-low" : ""
+              }`}>
+                <span className="nav-plan-name">{billing.plan_name}</span>
+                <span className="nav-credit-count">{billing.credits_remaining.toLocaleString()} cr</span>
+              </div>
+            )}
+            <button className="topnav-cta" onClick={() => setShowPricing(true)}>
+              Upgrade
             </button>
+            <div className="profile-menu-wrap" ref={profileMenuRef}>
+              <button
+                className="profile-avatar-btn"
+                onClick={() => setProfileOpen(o => !o)}
+                aria-label="Profile"
+              >
+                <span>{planInitial}</span>
+              </button>
 
-            {profileOpen && (
-              <div className="profile-dropdown">
+              {profileOpen && (
+                <div className="profile-dropdown">
                 {user ? (
                   <div className="pd-account-row">
                     <div>
@@ -520,10 +535,11 @@ export default function App() {
                   Privacy Policy
                   <svg className="pd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </a>
-              </div>
-            )}
-          </div>
-        </nav>
+                </div>
+              )}
+            </div>
+          </nav>
+        </div>
       </header>
 
       {/* ── Payment success banner ── */}
@@ -787,12 +803,6 @@ export default function App() {
                 <div className="eyebrow">Workspace</div>
                 <h2>Paste your essay below.</h2>
               </div>
-              {billing && (
-                <div className="editor-balance">
-                  <span className="editor-plan-badge">{billing.plan_name}</span>
-                  <span className="editor-credits">{billing.credits_remaining?.toLocaleString()} cr</span>
-                </div>
-              )}
             </div>
 
             <div className="editor-grid">
