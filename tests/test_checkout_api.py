@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 from backend.app.db.database import get_db
@@ -24,7 +26,7 @@ async def _fake_db():
 
 
 async def _fake_get_or_create_account(*args, **kwargs):
-    return object()
+    return SimpleNamespace(subscription_status="free")
 
 
 def test_checkout_config_error_returns_400(monkeypatch):
@@ -85,3 +87,31 @@ def test_checkout_success_returns_url(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["checkout_url"] == "https://polar.sh/checkout/test"
+
+
+def test_checkout_existing_subscriber_returns_customer_portal(monkeypatch):
+    async def fake_get_or_create_account(*args, **kwargs):
+        return SimpleNamespace(subscription_status="student_plus")
+
+    async def fake_create_customer_portal_url(*args, **kwargs):
+        return "https://polar.sh/portal/session"
+
+    async def fail_create_checkout_url(*args, **kwargs):
+        raise AssertionError("checkout should not be created for an existing subscriber")
+
+    monkeypatch.setattr("backend.app.main.billing_service.async_get_or_create_db_account", fake_get_or_create_account)
+    monkeypatch.setattr("backend.app.main.billing_service.create_customer_portal_url", fake_create_customer_portal_url)
+    monkeypatch.setattr("backend.app.main.billing_service.create_checkout_url", fail_create_checkout_url)
+    app.dependency_overrides[auth_service.get_current_user] = _auth_user
+    app.dependency_overrides[get_db] = _fake_db
+    try:
+        response = TestClient(app).post(
+            "/api/billing/checkout",
+            json={"product_code": "pro_monthly", "success_url": "http://localhost:5173/?payment_success=1"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["checkout_url"] == "https://polar.sh/portal/session"
+    assert "existing subscription" in response.json()["message"]

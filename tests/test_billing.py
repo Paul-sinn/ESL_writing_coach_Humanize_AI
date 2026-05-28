@@ -7,6 +7,7 @@ from backend.app.services.billing import (
     PolarCheckoutConfigError,
     PolarCheckoutUpstreamError,
     _is_safe_customer_email,
+    _polar_api_url,
 )
 
 
@@ -167,6 +168,58 @@ def test_create_checkout_url_calls_polar(monkeypatch, service):
         "external_customer_id": "00000000-0000-0000-0000-000000000001",
         "metadata": {"user_id": "00000000-0000-0000-0000-000000000001"},
     }
+
+
+def test_polar_api_url_accepts_base_with_version(monkeypatch):
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_api_base_url", "https://sandbox-api.polar.sh/v1")
+
+    assert _polar_api_url("/checkouts/") == "https://sandbox-api.polar.sh/v1/checkouts/"
+
+
+def test_create_customer_portal_url_calls_polar(monkeypatch, service):
+    captured = {}
+
+    class FakeResponse:
+        status_code = 201
+        text = "{}"
+
+        def json(self):
+            return {"customer_portal_url": "https://polar.sh/portal/session"}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            captured["timeout"] = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, json, headers):
+            captured["url"] = url
+            captured["body"] = json
+            captured["headers"] = headers
+            return FakeResponse()
+
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_access_token", "polar-token")
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_api_base_url", "https://sandbox-api.polar.sh/v1")
+    monkeypatch.setattr("backend.app.services.billing.httpx.AsyncClient", FakeAsyncClient)
+
+    url = asyncio.run(
+        service.create_customer_portal_url(
+            "00000000-0000-0000-0000-000000000001",
+            return_url="https://app.example.test/billing",
+        )
+    )
+
+    assert url == "https://polar.sh/portal/session"
+    assert captured["url"] == "https://sandbox-api.polar.sh/v1/customer-sessions/"
+    assert captured["body"] == {
+        "external_customer_id": "00000000-0000-0000-0000-000000000001",
+        "return_url": "https://app.example.test/billing",
+    }
+    assert captured["headers"]["User-Agent"] == "pj-1-humanize-app/0.1 customer-portal"
 
 
 def test_create_checkout_url_omits_reserved_demo_email(monkeypatch, service):

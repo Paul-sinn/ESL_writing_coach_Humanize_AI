@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parseaddr
+from urllib.parse import quote
 
 import httpx
 
@@ -125,6 +126,28 @@ def _polar_product_ids() -> dict[str, str]:
     }
 
 
+def _polar_subscription_plan_map() -> dict[str, tuple[str, str, int]]:
+    return {
+        settings.polar_product_id_starter: ("starter", "Starter", settings.starter_monthly_credits),
+        settings.polar_product_id_student_plus: (
+            "student_plus",
+            "Student Plus",
+            settings.student_plus_monthly_credits,
+        ),
+        settings.polar_product_id_pro: ("pro", "Pro", settings.pro_monthly_credits),
+    }
+
+
+def is_recurring_product_code(product_code: str) -> bool:
+    return product_code in {"starter_monthly", "student_plus_monthly", "pro_monthly"}
+
+
+def _polar_api_url(path: str) -> str:
+    base_url = settings.polar_api_base_url.rstrip("/")
+    versioned_base = base_url if base_url.endswith("/v1") else f"{base_url}/v1"
+    return f"{versioned_base}/{path.lstrip('/')}"
+
+
 def _is_safe_customer_email(email: str | None) -> bool:
     if not email:
         return False
@@ -215,7 +238,7 @@ class BillingService:
             body["external_customer_id"] = user_id
             body["metadata"] = {"user_id": user_id}
 
-        endpoint = f"{settings.polar_api_base_url.rstrip('/')}/v1/checkouts/"
+        endpoint = _polar_api_url("/checkouts/")
         headers = {
             "Authorization": f"Bearer {settings.polar_access_token}",
             "Content-Type": "application/json",
@@ -246,6 +269,50 @@ class BillingService:
         if not isinstance(checkout_url, str) or not checkout_url:
             raise PolarCheckoutUpstreamError("Polar checkout response did not include a checkout URL.")
         return checkout_url
+
+    async def create_customer_portal_url(
+        self,
+        user_id: str,
+        *,
+        return_url: str | None = None,
+    ) -> str:
+        if not settings.polar_access_token:
+            raise PolarCheckoutConfigError("Polar access token is not configured.")
+
+        body: dict[str, object] = {"external_customer_id": user_id}
+        if return_url:
+            body["return_url"] = return_url
+
+        headers = {
+            "Authorization": f"Bearer {settings.polar_access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "pj-1-humanize-app/0.1 customer-portal",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(_polar_api_url("/customer-sessions/"), json=body, headers=headers)
+        except httpx.RequestError as exc:
+            detail = str(exc)
+            print(f"Polar customer session request failed: {detail}")
+            raise PolarCheckoutUpstreamError(detail) from exc
+
+        if response.status_code >= 400:
+            detail = response.text
+            print(f"Polar customer session failed ({response.status_code}): {detail}")
+            raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            detail = response.text
+            print(f"Polar customer session returned invalid JSON: {detail}")
+            raise PolarCheckoutUpstreamError("Polar customer session response was not valid JSON.") from exc
+
+        portal_url = payload.get("customer_portal_url")
+        if not isinstance(portal_url, str) or not portal_url:
+            raise PolarCheckoutUpstreamError("Polar customer session response did not include a portal URL.")
+        return portal_url
 
     # ── Async DB methods (real users only) ────────────────────────────────────
 
@@ -348,6 +415,90 @@ class BillingService:
             subscription_status=account.subscription_status,
             credits_remaining=account.credits_remaining,
         )
+
+    async def async_sync_from_polar_customer_state(self, user_id: str, db: "AsyncSession") -> bool:
+        """Repair local billing state from Polar when a webhook was missed."""
+        if not settings.polar_access_token:
+            return False
+
+        headers = {
+            "Authorization": f"Bearer {settings.polar_access_token}",
+            "Accept": "application/json",
+            "User-Agent": "pj-1-humanize-app/0.1 customer-state-sync",
+        }
+        endpoint = _polar_api_url(f"/customers/external/{quote(user_id, safe='')}/state")
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.get(endpoint, headers=headers)
+        except httpx.RequestError as exc:
+            print(f"Polar customer state request failed: {exc}")
+            return False
+
+        if response.status_code == 404:
+            return False
+        if response.status_code >= 400:
+            print(f"Polar customer state sync failed ({response.status_code}): {response.text}")
+            return False
+
+        try:
+            payload = response.json()
+        except ValueError:
+            print("Polar customer state sync returned invalid JSON.")
+            return False
+
+        active_subscriptions = payload.get("active_subscriptions")
+        if not isinstance(active_subscriptions, list):
+            return False
+
+        product_map = _polar_subscription_plan_map()
+        matched_subscription: dict | None = None
+        matched_plan: tuple[str, str, int] | None = None
+        for subscription in active_subscriptions:
+            if not isinstance(subscription, dict):
+                continue
+            plan = product_map.get(str(subscription.get("product_id", "")))
+            if plan:
+                matched_subscription = subscription
+                matched_plan = plan
+                break
+
+        account = await self.async_get_or_create_db_account(user_id, db)
+        if matched_subscription and matched_plan:
+            new_status, plan_name, monthly_credits = matched_plan
+            account.subscription_status = new_status
+            account.plan_name = plan_name
+            account.monthly_credit_limit = monthly_credits
+            account.polar_subscription_id = str(matched_subscription.get("id") or "")
+            if account.credits_remaining < monthly_credits:
+                account.credits_remaining = monthly_credits
+            await self.async_sync_subscription(
+                user_id,
+                subscription_status=new_status,
+                plan_name=plan_name,
+                monthly_credit_limit=monthly_credits,
+                polar_subscription_id=account.polar_subscription_id,
+                db=db,
+            )
+            self._accounts[user_id] = UserAccount(user_id, new_status, account.credits_remaining)
+            return True
+
+        if account.subscription_status != "free" or account.polar_subscription_id:
+            account.subscription_status = "free"
+            account.plan_name = "Free"
+            account.monthly_credit_limit = 0
+            account.polar_subscription_id = None
+            await self.async_sync_subscription(
+                user_id,
+                subscription_status="free",
+                plan_name="Free",
+                monthly_credit_limit=0,
+                polar_subscription_id=None,
+                db=db,
+            )
+            self._accounts[user_id] = UserAccount(user_id, "free", account.credits_remaining)
+            return True
+
+        return False
 
     async def async_deduct_credits(self, user_id: str, amount: int, db: "AsyncSession") -> None:
         """Persist credit deduction to DB with row-level lock."""

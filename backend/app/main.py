@@ -29,7 +29,13 @@ from .schemas import (
     UserResponse,
 )
 from .services import auth as auth_service
-from .services.billing import PolarCheckoutConfigError, PolarCheckoutUpstreamError, billing_service
+from .services.billing import (
+    PolarCheckoutConfigError,
+    PolarCheckoutUpstreamError,
+    billing_service,
+    is_recurring_product_code,
+)
+from .lib.encryption import decrypt
 from .services.polar_webhook import (
     handle_order_event,
     handle_subscription_event,
@@ -59,6 +65,12 @@ def _billing_limit_detail(response: CoachResponse | HumanizeResponse) -> dict | 
         "upgrade_url": redirect.route,
         "checkout_options": [option.model_dump() for option in redirect.checkout_options],
     }
+
+
+def _maybe_decrypt(value: str | None) -> str | None:
+    if value and value.count(":") == 2:
+        return decrypt(value)
+    return value
 
 
 @asynccontextmanager
@@ -233,6 +245,12 @@ async def billing_status(
     if db is not None and _uses_persistent_billing(user_id):
         try:
             await billing_service.async_load_to_memory(user_id, db)
+            status = billing_service.get_status(user_id)
+            if status.subscription_status == "free":
+                synced = await billing_service.async_sync_from_polar_customer_state(user_id, db)
+                if synced:
+                    await db.commit()
+                    await billing_service.async_load_to_memory(user_id, db)
         except Exception:
             pass
     return billing_service.get_status(user_id)
@@ -290,10 +308,13 @@ async def auth_me(
         except Exception:
             profile = None
     status = billing_service.get_status(user_id)
+    profile_name = None
+    if profile:
+        profile_name = _maybe_decrypt(getattr(profile, "full_name", None)) or profile.nickname
     return UserResponse(
         email=current_user.email,
         username=profile.username if profile else None,  # type: ignore[arg-type]
-        nickname=profile.nickname if profile else None,  # type: ignore[arg-type]
+        nickname=profile_name,
         plan_name=status.plan_name,
         credits_remaining=status.credits_remaining,
         subscription_status=status.subscription_status,
@@ -311,8 +332,23 @@ async def billing_checkout(
     if _uses_persistent_billing(current_user.user_id):
         if db is None:
             raise HTTPException(status_code=503, detail="Billing database is unavailable.")
-        await billing_service.async_get_or_create_db_account(current_user.user_id, db)
+        account = await billing_service.async_get_or_create_db_account(current_user.user_id, db)
         await db.commit()
+        if (
+            is_recurring_product_code(payload.product_code)
+            and account.subscription_status != "free"
+        ):
+            try:
+                portal_url = await billing_service.create_customer_portal_url(
+                    current_user.user_id,
+                    return_url=payload.success_url,
+                )
+            except (PolarCheckoutConfigError, PolarCheckoutUpstreamError) as exc:
+                raise HTTPException(status_code=502, detail="Polar 고객 포털 생성에 실패했습니다.") from exc
+            return CheckoutResponse(
+                checkout_url=portal_url,
+                message="Redirect the user to manage their existing subscription.",
+            )
     try:
         checkout_url = await billing_service.create_checkout_url(
             payload.product_code,
@@ -323,6 +359,27 @@ async def billing_checkout(
     except PolarCheckoutConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PolarCheckoutUpstreamError as exc:
+        if (
+            db is not None
+            and _uses_persistent_billing(current_user.user_id)
+            and is_recurring_product_code(payload.product_code)
+            and "subscription" in str(exc.detail).lower()
+        ):
+            synced = await billing_service.async_sync_from_polar_customer_state(current_user.user_id, db)
+            if synced:
+                await db.commit()
+            try:
+                portal_url = await billing_service.create_customer_portal_url(
+                    current_user.user_id,
+                    return_url=payload.success_url,
+                )
+            except (PolarCheckoutConfigError, PolarCheckoutUpstreamError):
+                pass
+            else:
+                return CheckoutResponse(
+                    checkout_url=portal_url,
+                    message="Redirect the user to manage their existing subscription.",
+                )
         raise HTTPException(status_code=502, detail="Polar checkout 생성에 실패했습니다.") from exc
     return CheckoutResponse(
         checkout_url=checkout_url,
