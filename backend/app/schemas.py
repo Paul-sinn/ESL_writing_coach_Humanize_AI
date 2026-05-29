@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,6 +10,7 @@ from .utils.text import count_words
 
 
 settings = get_settings()
+USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,50}$")
 
 AssignmentType = Literal[
     "discussion_post",
@@ -119,6 +121,7 @@ class BillingStatusResponse(BaseModel):
 
 class CheckoutRequest(BaseModel):
     product_code: Literal[
+        "free",
         "starter_monthly",
         "student_plus_monthly",
         "pro_monthly",
@@ -155,3 +158,28 @@ class UserResponse(BaseModel):
     plan_name: str
     credits_remaining: int
     subscription_status: str
+    needs_onboarding: bool = False
+
+
+class DeleteAccountResponse(BaseModel):
+    deleted: bool
+    message: str
+
+
+class CompleteOnboardingRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    accepted_terms: bool
+    accepted_privacy: bool
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        username = value.strip()
+        if not USERNAME_PATTERN.fullmatch(username):
+            raise ValueError("Username must use 3-50 letters, numbers, or underscores.")
+        return username
+
+
+class CompleteOnboardingResponse(BaseModel):
+    username: str
+    onboarded: bool

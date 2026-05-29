@@ -1,6 +1,6 @@
 const PLANS = [
   {
-    code: null,
+    code: "free",
     statusKey: "free",
     name: "Free",
     price: 0,
@@ -65,7 +65,12 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
             const isCurrent = plan.statusKey === (currentStatus ?? "free");
             const planIdx = PLAN_ORDER.indexOf(plan.statusKey);
             const isDowngrade = planIdx < currentIdx;
-            const isUpgrade = !isCurrent && !isDowngrade && plan.code !== null;
+            const isPlanChange = !isCurrent;
+            const actionLabel = plan.statusKey === "free"
+              ? "구독 취소 관리"
+              : isDowngrade
+                ? "다운그레이드 관리 →"
+                : "업그레이드 →";
 
             return (
               <div key={plan.name} className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`}>
@@ -85,18 +90,18 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
 
                 {isCurrent ? (
                   <div className="pricing-current-badge">현재 플랜</div>
-                ) : isUpgrade ? (
+                ) : isPlanChange ? (
                   <button
                     className={`pricing-upgrade-btn${plan.featured ? " pricing-upgrade-btn-primary" : ""}`}
                     onClick={() => onCheckout(plan.code)}
                     disabled={loading === plan.code}
                   >
-                    {loading === plan.code ? "이동 중…" : "업그레이드 →"}
+                    {loading === plan.code ? "이동 중…" : actionLabel}
                   </button>
-                ) : plan.code === null ? (
+                ) : currentStatus === "free" && plan.statusKey === "free" ? (
                   <button className="pricing-upgrade-btn pricing-upgrade-btn-muted" onClick={onClose}>무료로 시작</button>
                 ) : (
-                  <button className="pricing-upgrade-btn pricing-upgrade-btn-muted" disabled>현재 플랜보다 낮음</button>
+                  <div className="pricing-current-badge">현재 플랜</div>
                 )}
               </div>
             );

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -14,7 +15,7 @@ from sqlalchemy import select
 
 from .config import get_settings
 from .db.database import DbSession
-from .db.models import Profile
+from .db.models import Profile, UserActivityLogDB
 from .graphs import calculate_coach_credits, calculate_humanize_credits, coach_graph, humanize_graph
 from .schemas import (
     BillingStatusResponse,
@@ -22,11 +23,15 @@ from .schemas import (
     CheckoutResponse,
     CoachRequest,
     CoachResponse,
+    CompleteOnboardingRequest,
+    CompleteOnboardingResponse,
+    DeleteAccountResponse,
     DemoLoginRequest,
     DemoLoginResponse,
     HumanizeRequest,
     HumanizeResponse,
     UserResponse,
+    USERNAME_PATTERN,
 )
 from .services import auth as auth_service
 from .services.billing import (
@@ -73,6 +78,25 @@ def _maybe_decrypt(value: str | None) -> str | None:
     return value
 
 
+async def _load_profile(user_id: str, db) -> Profile | None:
+    result = await db.execute(select(Profile).where(Profile.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def _require_active_user(current_user, db: DbSession) -> Profile | None:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = current_user.user_id
+    if not _uses_persistent_billing(user_id):
+        return None
+    if db is None:
+        raise HTTPException(status_code=503, detail="Account database is unavailable.")
+    profile = await _load_profile(user_id, db)
+    if profile is not None and profile.deleted_at is not None:
+        raise HTTPException(status_code=403, detail="This account has been deleted.")
+    return profile
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -112,8 +136,7 @@ async def coach(
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> CoachResponse:
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    await _require_active_user(current_user, db)
     user_id = current_user.user_id
     reserved_ledger_id: int | None = None
 
@@ -174,8 +197,7 @@ async def humanize(
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> HumanizeResponse:
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    await _require_active_user(current_user, db)
     user_id = current_user.user_id
     reserved_ledger_id: int | None = None
 
@@ -239,8 +261,7 @@ async def billing_status(
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> BillingStatusResponse:
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    await _require_active_user(current_user, db)
     user_id = current_user.user_id
     if db is not None and _uses_persistent_billing(user_id):
         try:
@@ -258,6 +279,9 @@ async def billing_status(
 
 @app.get("/api/auth/check-username")
 async def check_username(username: str, db: DbSession) -> dict:
+    username = username.strip()
+    if not USERNAME_PATTERN.fullmatch(username):
+        return {"available": False}
     if db is None:
         return {"available": True}
     try:
@@ -296,21 +320,27 @@ async def auth_me(
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> UserResponse:
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    profile = await _require_active_user(current_user, db)
     user_id = current_user.user_id
-    profile = None
     if db is not None and _uses_persistent_billing(user_id):
         try:
-            result = await db.execute(select(Profile).where(Profile.id == user_id))
-            profile = result.scalar_one_or_none()
+            if profile is None:
+                profile = await _load_profile(user_id, db)
             await billing_service.async_load_to_memory(user_id, db)
         except Exception:
             profile = None
     status = billing_service.get_status(user_id)
     profile_name = None
+    needs_onboarding = False
     if profile:
         profile_name = _maybe_decrypt(getattr(profile, "full_name", None)) or profile.nickname
+        needs_onboarding = not (
+            profile.username
+            and profile.terms_accepted_at
+            and profile.privacy_accepted_at
+        )
+    elif _uses_persistent_billing(user_id):
+        needs_onboarding = True
     return UserResponse(
         email=current_user.email,
         username=profile.username if profile else None,  # type: ignore[arg-type]
@@ -318,6 +348,97 @@ async def auth_me(
         plan_name=status.plan_name,
         credits_remaining=status.credits_remaining,
         subscription_status=status.subscription_status,
+        needs_onboarding=needs_onboarding,
+    )
+
+
+@app.post("/api/auth/complete-onboarding", response_model=CompleteOnboardingResponse)
+async def complete_onboarding(
+    payload: CompleteOnboardingRequest,
+    db: DbSession,
+    current_user=Depends(auth_service.get_current_user),
+) -> CompleteOnboardingResponse:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = current_user.user_id
+    if not _uses_persistent_billing(user_id):
+        raise HTTPException(status_code=400, detail="Demo accounts do not require onboarding.")
+    if db is None:
+        raise HTTPException(status_code=503, detail="Account database is unavailable.")
+    if not payload.accepted_terms or not payload.accepted_privacy:
+        raise HTTPException(status_code=400, detail="Terms and Privacy Policy must be accepted.")
+
+    uid = UUID(user_id)
+    result = await db.execute(
+        select(Profile).where(Profile.username == payload.username, Profile.id != uid)
+    )
+    if result.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=409, detail="Username is already taken.")
+
+    profile = await _load_profile(user_id, db)
+    now = datetime.now(timezone.utc)
+    if profile is None:
+        profile = Profile(id=uid, email=current_user.email)
+        db.add(profile)
+        await db.flush()
+    if profile.deleted_at is not None:
+        raise HTTPException(status_code=403, detail="This account has been deleted.")
+
+    profile.username = payload.username
+    if not profile.nickname:
+        profile.nickname = payload.username
+    profile.terms_accepted_at = profile.terms_accepted_at or now
+    profile.privacy_accepted_at = profile.privacy_accepted_at or now
+    profile.onboarded_at = profile.onboarded_at or now
+    await db.commit()
+    return CompleteOnboardingResponse(username=payload.username, onboarded=True)
+
+
+@app.post("/api/auth/delete-account", response_model=DeleteAccountResponse)
+async def delete_account(
+    request: Request,
+    db: DbSession,
+    current_user=Depends(auth_service.get_current_user),
+) -> DeleteAccountResponse:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = current_user.user_id
+    if not _uses_persistent_billing(user_id):
+        raise HTTPException(status_code=400, detail="Demo accounts cannot be deleted.")
+    if db is None:
+        raise HTTPException(status_code=503, detail="Account database is unavailable.")
+
+    profile = await _load_profile(user_id, db)
+    if profile is None:
+        profile = Profile(id=UUID(user_id), email=current_user.email)
+        db.add(profile)
+        await db.flush()
+
+    if profile.deleted_at is None:
+        profile.deleted_at = datetime.now(timezone.utc)
+        db.add(UserActivityLogDB(
+            user_id=UUID(user_id),
+            event_type="account_deleted",
+            ip_address=request.client.host if request.client else None,
+        ))
+        account = await billing_service.async_get_or_create_db_account(user_id, db)
+        account.subscription_status = "free"
+        account.plan_name = "Free"
+        account.monthly_credit_limit = 0
+        account.credits_remaining = 0
+        await billing_service.async_sync_subscription(
+            user_id,
+            subscription_status="free",
+            plan_name="Free",
+            monthly_credit_limit=0,
+            polar_subscription_id=account.polar_subscription_id,
+            db=db,
+        )
+        billing_service._accounts.pop(user_id, None)
+    await db.commit()
+    return DeleteAccountResponse(
+        deleted=True,
+        message="Account deleted. Activity logs are retained for account history.",
     )
 
 
@@ -327,15 +448,14 @@ async def billing_checkout(
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
 ) -> CheckoutResponse:
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    await _require_active_user(current_user, db)
     if _uses_persistent_billing(current_user.user_id):
         if db is None:
             raise HTTPException(status_code=503, detail="Billing database is unavailable.")
         account = await billing_service.async_get_or_create_db_account(current_user.user_id, db)
         await db.commit()
         if (
-            is_recurring_product_code(payload.product_code)
+            (payload.product_code == "free" or is_recurring_product_code(payload.product_code))
             and account.subscription_status != "free"
         ):
             try:
@@ -348,6 +468,11 @@ async def billing_checkout(
             return CheckoutResponse(
                 checkout_url=portal_url,
                 message="Redirect the user to manage their existing subscription.",
+            )
+        if payload.product_code == "free":
+            return CheckoutResponse(
+                checkout_url=payload.success_url or "/",
+                message="No active subscription to cancel.",
             )
     try:
         checkout_url = await billing_service.create_checkout_url(

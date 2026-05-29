@@ -21,9 +21,17 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, nullable=True)
+    email_hash = Column(String(64), nullable=True, unique=True, index=True)
+    full_name = Column(String, nullable=True)
+    full_name_hash = Column(String(64), nullable=True, index=True)
     username = Column(String(50), nullable=True, unique=True, index=True)
     nickname = Column(String(50), nullable=True, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    privacy_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    onboarded_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     account = relationship("UserAccountDB", back_populates="profile", uselist=False, cascade="all, delete-orphan")
     credit_ledger = relationship("CreditLedgerDB", back_populates="profile", cascade="all, delete-orphan")
@@ -86,3 +94,13 @@ class CreditLedgerDB(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     profile = relationship("Profile", back_populates="credit_ledger")
+
+
+class UserActivityLogDB(Base):
+    __tablename__ = "user_activity_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=True, index=True)
+    event_type = Column(String(80), nullable=False)
+    ip_address = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)

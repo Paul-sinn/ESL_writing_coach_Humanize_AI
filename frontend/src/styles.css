@@ -622,6 +622,7 @@ html.dark .landing-blob-blue {
   max-width: 680px;
   padding: 40px 24px;
   pointer-events: none;
+  transform: translateY(-36px);
 }
 
 .landing-tag {
@@ -857,6 +858,7 @@ html.dark .landing-stat-card {
 
 @media (max-width: 900px) {
   .landing-stat-card { display: none; }
+  .landing-content { transform: translateY(-24px); }
 }
 
 .landing-stat-value {
@@ -1279,6 +1281,23 @@ button:disabled {
   background: rgba(138, 180, 216, 0.12);
   transform: none;
   box-shadow: none;
+}
+
+.pd-item:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.pd-item-danger {
+  color: #b42318;
+}
+
+.pd-item-danger .pd-icon {
+  color: #b42318;
+}
+
+.pd-item-danger:hover {
+  background: rgba(180, 35, 24, 0.08);
 }
 
 .pd-icon {

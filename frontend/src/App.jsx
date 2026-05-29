@@ -123,7 +123,7 @@ function ScoreCard({ label, score, invert = false }) {
 }
 
 export default function App() {
-  const { user, loading: authStateLoading, signInWithGoogle, signInWithPassword, signInWithDemo, signUp: supabaseSignUp, signOut: supabaseSignOut, demoEmail, demoPassword } = useAuth();
+  const { user, loading: authStateLoading, onboardingRequired, signInWithGoogle, signInWithPassword, signInWithDemo, signUp: supabaseSignUp, signOut: supabaseSignOut, deleteAccount, completeOnboarding, demoEmail, demoPassword } = useAuth();
   const [showEditor, setShowEditor] = useState(() => localStorage.getItem("showEditor") === "true");
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function App() {
 
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "verify"
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "google" | "verify"
   const [authEmail, setAuthEmail] = useState("");
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -171,6 +171,7 @@ export default function App() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [showLimitCta, setShowLimitCta] = useState(false);
   const [limitNotice, setLimitNotice] = useState(null);
+  const [accountDeleting, setAccountDeleting] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("darkMode", darkMode);
@@ -270,6 +271,16 @@ export default function App() {
     }
   }, [showEditor, user, authStateLoading]);
 
+  useEffect(() => {
+    if (!onboardingRequired) return;
+    setAuthMode("google");
+    setAuthUsername("");
+    setUsernameAvail(null);
+    setTosAgreed(false);
+    setAuthError("");
+    setShowAuthModal(true);
+  }, [onboardingRequired]);
+
   async function handleCoach() {
     setLoading(true);
     setError("");
@@ -367,6 +378,26 @@ export default function App() {
     setShowEditor(false);
   }
 
+  async function handleDeleteAccount() {
+    if (!window.confirm("Delete this account? You will be signed out and cannot use the app with this account again.")) {
+      return;
+    }
+    setAccountDeleting(true);
+    setError("");
+    try {
+      await deleteAccount();
+      setProfileOpen(false);
+      setBilling(null);
+      setShowEditor(false);
+      setResult(null);
+      setHumanizeResult(null);
+    } catch (err) {
+      setError(err.message ?? "Account deletion failed.");
+    } finally {
+      setAccountDeleting(false);
+    }
+  }
+
   function openAuth(mode = "login") {
     setAuthMode(mode);
     setAuthEmail(""); setEmailAvail(null);
@@ -397,6 +428,8 @@ export default function App() {
       const { session: newSession } = await supabaseSignUp(authEmail, authPassword, {
         username: authUsername,
         nickname: authUsername,
+        accepted_terms: true,
+        accepted_privacy: true,
       });
       if (newSession) {
         setShowAuthModal(false);
@@ -424,11 +457,41 @@ export default function App() {
     }
   }
 
-  async function handleGoogleSignIn() {
+  async function handleGoogleStart() {
+    setAuthLoading(true);
+    setAuthError("");
     try {
       await signInWithGoogle();
     } catch (err) {
       setAuthError(err.message);
+      setAuthLoading(false);
+    }
+  }
+
+  async function handleGoogleOnboarding(e) {
+    e.preventDefault();
+    const username = authUsername.trim();
+    if (!/^[a-zA-Z0-9_]{3,50}$/.test(username)) {
+      setAuthError("Username must use 3-50 letters, numbers, or underscores.");
+      return;
+    }
+    if (!tosAgreed) {
+      setAuthError("Please agree to the Terms of Service and Privacy Policy.");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      await completeOnboarding({
+        username,
+        accepted_terms: true,
+        accepted_privacy: true,
+      });
+      setShowAuthModal(false);
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
     }
   }
 
@@ -530,6 +593,14 @@ export default function App() {
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                     </span>
                     Log in / Sign up
+                  </button>
+                )}
+                {user && user.app_metadata?.provider !== "demo" && (
+                  <button className="pd-item pd-item-danger" onClick={handleDeleteAccount} disabled={accountDeleting}>
+                    <span className="pd-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </span>
+                    {accountDeleting ? "Deleting..." : "Delete account"}
                   </button>
                 )}
                 <div className="pd-item pd-item-toggle" onClick={() => setDarkMode(d => !d)}>
@@ -682,7 +753,7 @@ export default function App() {
                   <h3>Create account</h3>
                   <p>Start coaching your ESL academic writing for free.</p>
                 </div>
-                <button type="button" className="auth-google-btn" onClick={handleGoogleSignIn}>
+                <button type="button" className="auth-google-btn" onClick={handleGoogleStart} disabled={authLoading}>
                   <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
                   Continue with Google
                 </button>
@@ -736,13 +807,41 @@ export default function App() {
               </>
             )}
 
+            {authMode === "google" && (
+              <>
+                <div className="auth-modal-header">
+                  <h3>Finish Google sign up</h3>
+                  <p>Add a username so your account is easy to find later.</p>
+                </div>
+                <form onSubmit={handleGoogleOnboarding}>
+                  <div className="auth-field">
+                    <label>Username</label>
+                    <input type="text" value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} placeholder="letters, numbers, _ (3+ chars)" required minLength={3} maxLength={50} pattern="^[a-zA-Z0-9_]+$" title="Letters, numbers, and underscores only" autoFocus />
+                  </div>
+                  <label className="auth-tos-label">
+                    <input type="checkbox" checked={tosAgreed} onChange={(e) => setTosAgreed(e.target.checked)} />
+                    <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></span>
+                  </label>
+                  {authError && <div className="auth-error">{authError}</div>}
+                  <button type="submit" className="auth-google-btn" disabled={authLoading || !authUsername.trim() || !tosAgreed}>
+                    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                    {authLoading ? "Opening Google..." : "Continue with Google"}
+                  </button>
+                </form>
+                <div className="auth-switch">
+                  Use email instead?{" "}
+                  <button type="button" className="auth-link" onClick={() => openAuth("register")}>Create account</button>
+                </div>
+              </>
+            )}
+
             {authMode === "login" && (
               <>
                 <div className="auth-modal-header">
                   <h3>Welcome back</h3>
                   <p>Log in to your Writing Coach account.</p>
                 </div>
-                <button type="button" className="auth-google-btn" onClick={handleGoogleSignIn}>
+                <button type="button" className="auth-google-btn" onClick={handleGoogleStart} disabled={authLoading}>
                   <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
                   Continue with Google
                 </button>

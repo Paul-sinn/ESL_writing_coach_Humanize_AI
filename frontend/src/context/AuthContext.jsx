@@ -24,6 +24,70 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => readDemoUser());
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingRequired, setOnboardingRequired] = useState(false);
+
+  async function getBackendAccountState(accessToken) {
+    const response = await fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (response.status === 403) return { active: false, needsOnboarding: false };
+    if (!response.ok) return { active: true, needsOnboarding: false };
+    const data = await response.json().catch(() => null);
+    return { active: true, needsOnboarding: data?.needs_onboarding === true };
+  }
+
+  async function completeOnboarding(onboarding) {
+    const demoToken = localStorage.getItem(DEMO_TOKEN_KEY);
+    const token = demoToken || session?.access_token;
+    if (!token) throw new Error("Login is required.");
+    const response = await fetch(`${API_BASE}/api/auth/complete-onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(onboarding),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.detail || "Account setup failed.");
+    }
+    setOnboardingRequired(false);
+    setUser((current) => current ? {
+      ...current,
+      user_metadata: {
+        ...(current.user_metadata || {}),
+        username: onboarding.username,
+        nickname: current.user_metadata?.nickname || onboarding.username,
+        accepted_terms: true,
+        accepted_privacy: true,
+      },
+    } : current);
+    return data;
+  }
+
+  async function applySupabaseSession(nextSession) {
+    setSession(nextSession);
+    if (!nextSession?.user) {
+      setUser(null);
+      setOnboardingRequired(false);
+      setLoading(false);
+      return;
+    }
+    const accountState = await getBackendAccountState(nextSession.access_token)
+      .catch(() => ({ active: true, needsOnboarding: false }));
+    if (!accountState.active) {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setOnboardingRequired(false);
+      setLoading(false);
+      return;
+    }
+    setOnboardingRequired(accountState.needsOnboarding);
+    setUser(nextSession.user);
+    setLoading(false);
+  }
 
   useEffect(() => {
     const demoUser = readDemoUser();
@@ -36,15 +100,11 @@ export function AuthProvider({ children }) {
     if (!supabase) { setLoading(false); return; }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      applySupabaseSession(session);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      applySupabaseSession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -121,10 +181,27 @@ export function AuthProvider({ children }) {
     }
     setSession(null);
     setUser(null);
+    setOnboardingRequired(false);
+  }
+
+  async function deleteAccount() {
+    const demoToken = localStorage.getItem(DEMO_TOKEN_KEY);
+    const token = demoToken || session?.access_token;
+    if (!token) throw new Error("Login is required.");
+    const response = await fetch(`${API_BASE}/api/auth/delete-account`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.detail || "Account deletion failed.");
+    }
+    await signOut();
+    return data;
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signInWithPassword, signInWithDemo, signUp, signOut, demoEmail: DEMO_EMAIL, demoPassword: DEMO_PASSWORD }}>
+    <AuthContext.Provider value={{ user, session, loading, onboardingRequired, signInWithGoogle, signInWithPassword, signInWithDemo, signUp, signOut, deleteAccount, completeOnboarding, demoEmail: DEMO_EMAIL, demoPassword: DEMO_PASSWORD }}>
       {children}
     </AuthContext.Provider>
   );
