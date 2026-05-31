@@ -298,6 +298,12 @@ html.dark .brand-wordmark {
   box-shadow: var(--shadow);
 }
 
+html.dark .result-card {
+  background: linear-gradient(180deg, rgba(28, 28, 44, 0.96), rgba(20, 20, 32, 0.94));
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+}
+
 /* ── Hero page ── */
 .hero-page {
   position: relative;
@@ -1104,6 +1110,26 @@ button:disabled {
   background: rgba(138, 180, 216, 0.24);
 }
 
+html.dark .verdict {
+  color: #dfe8f5;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html.dark .verdict.low,
+html.dark .verdict.humanized {
+  background: rgba(107, 155, 210, 0.16);
+}
+
+html.dark .verdict.medium {
+  background: rgba(232, 146, 74, 0.18);
+  color: #f1c49a;
+}
+
+html.dark .verdict.high {
+  background: rgba(229, 105, 90, 0.16);
+  color: #f0aaa0;
+}
+
 .summary,
 .cta-banner {
   font-size: 1.05rem;
@@ -1128,6 +1154,12 @@ button:disabled {
   padding: 10px 14px;
   border-radius: 999px;
   background: rgba(138, 180, 216, 0.14);
+}
+
+html.dark .signal-list span {
+  background: rgba(107, 155, 210, 0.13);
+  color: #d8e2f0;
+  border: 1px solid rgba(139, 180, 217, 0.12);
 }
 
 .sentence-list {
@@ -1683,6 +1715,15 @@ button:disabled {
   color: var(--accent-strong);
 }
 
+html.dark .collapsible-header {
+  color: #9fc1e6;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+html.dark .collapsible-header:hover {
+  color: #c1d9f1;
+}
+
 .collapsible-arrow {
   font-size: 1rem;
   color: var(--muted);
@@ -1713,6 +1754,12 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+html.dark .feedback-item {
+  background: rgba(18, 18, 30, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
 .feedback-item.issue-ai_pattern { border-left-color: #e8924a; }
 .feedback-item.issue-unnatural_english { border-left-color: #4a90d9; }
 .feedback-item.issue-robotic_tone { border-left-color: #9b6fce; }
@@ -1735,6 +1782,12 @@ button:disabled {
   color: var(--accent);
 }
 
+html.dark .issue-badge {
+  background: rgba(107, 155, 210, 0.14);
+  color: #bdd7f0;
+  border: 1px solid rgba(139, 180, 217, 0.14);
+}
+
 .feedback-quote {
   margin: 8px 0;
   padding: 8px 14px;
@@ -1746,10 +1799,20 @@ button:disabled {
   border-radius: 0 10px 10px 0;
 }
 
+html.dark .feedback-quote {
+  background: rgba(255, 255, 255, 0.045);
+  border-left-color: rgba(139, 180, 217, 0.24);
+  color: #aeb8ca;
+}
+
 .feedback-explanation {
   margin: 8px 0;
   font-size: 0.95rem;
   line-height: 1.6;
+}
+
+html.dark .feedback-explanation {
+  color: #d9dee8;
 }
 
 .feedback-suggestion {
@@ -1761,9 +1824,19 @@ button:disabled {
   line-height: 1.5;
 }
 
+html.dark .feedback-suggestion {
+  background: rgba(107, 155, 210, 0.1);
+  color: #d6dfed;
+  border: 1px solid rgba(139, 180, 217, 0.12);
+}
+
 .suggestion-label {
   font-weight: 700;
   color: var(--accent);
+}
+
+html.dark .suggestion-label {
+  color: #9fc1e6;
 }
 
 /* ── Strengths ── */
@@ -1786,6 +1859,12 @@ button:disabled {
   background: rgba(82, 169, 107, 0.12);
   color: #2d7a47;
   font-size: 0.9rem;
+}
+
+html.dark .strength-chip {
+  background: rgba(92, 194, 122, 0.13);
+  color: #9bd9ad;
+  border-color: rgba(92, 194, 122, 0.18);
 }
 
 /* ── Academic integrity ── */
@@ -1842,6 +1921,11 @@ button:disabled {
   text-align: center;
 }
 
+html.dark .score-card {
+  background: rgba(18, 18, 30, 0.86);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 .score-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -1868,6 +1952,10 @@ button:disabled {
 .score-warn { color: #b35e00; }
 .score-danger { color: #9a2d1f; }
 
+html.dark .score-good { color: #77d38f; }
+html.dark .score-warn { color: #f1b672; }
+html.dark .score-danger { color: #ee958b; }
+
 /* ── Severity badges ── */
 .severity-badge {
   display: inline-block;
@@ -1882,6 +1970,10 @@ button:disabled {
 .severity-high { background: rgba(154, 45, 31, 0.12); color: #9a2d1f; }
 .severity-medium { background: rgba(179, 94, 0, 0.1); color: #b35e00; }
 .severity-low { background: rgba(138, 180, 216, 0.18); color: var(--muted); }
+
+html.dark .severity-high { background: rgba(229, 105, 90, 0.16); color: #f0aaa0; }
+html.dark .severity-medium { background: rgba(232, 146, 74, 0.16); color: #f1c49a; }
+html.dark .severity-low { background: rgba(139, 180, 217, 0.13); color: #b7c3d8; }
 
 /* ── Result text ── */
 .result-summary-text {

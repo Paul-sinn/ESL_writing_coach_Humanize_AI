@@ -61,7 +61,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 function countWords(text) {
   const tokens = text.trim().split(/\s+/).filter(Boolean);
   return tokens.reduce((sum, token) => {
-    return sum + (token.length > 20 ? Math.ceil(token.length / 5) : 1);
+    return sum + (token.length > 20 ? Math.round(token.length / 5) : 1);
   }, 0);
 }
 
