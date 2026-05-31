@@ -100,9 +100,12 @@ async def _require_active_user(current_user, db: DbSession) -> Profile | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        from .db.init_db import create_tables
+        from .db.init_db import create_tables, should_bootstrap_schema
         await create_tables()
-        print("✅ DB tables created / verified.")
+        if should_bootstrap_schema():
+            print("✅ DB tables created / verified.")
+        else:
+            print("✅ DB connection verified; remote schema bootstrap skipped.")
     except Exception as e:
         print(f"⚠️  DB startup failed: {e}")
     yield
@@ -265,13 +268,10 @@ async def billing_status(
     user_id = current_user.user_id
     if db is not None and _uses_persistent_billing(user_id):
         try:
+            synced = await billing_service.async_sync_from_polar_customer_state(user_id, db)
+            if synced:
+                await db.commit()
             await billing_service.async_load_to_memory(user_id, db)
-            status = billing_service.get_status(user_id)
-            if status.subscription_status == "free":
-                synced = await billing_service.async_sync_from_polar_customer_state(user_id, db)
-                if synced:
-                    await db.commit()
-                    await billing_service.async_load_to_memory(user_id, db)
         except Exception:
             pass
     return billing_service.get_status(user_id)
@@ -324,11 +324,9 @@ async def auth_me(
     user_id = current_user.user_id
     if db is not None and _uses_persistent_billing(user_id):
         try:
-            if profile is None:
-                profile = await _load_profile(user_id, db)
             await billing_service.async_load_to_memory(user_id, db)
         except Exception:
-            profile = None
+            pass
     status = billing_service.get_status(user_id)
     profile_name = None
     needs_onboarding = False

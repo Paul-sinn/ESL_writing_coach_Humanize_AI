@@ -6,14 +6,50 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ..config import get_settings
 
 settings = get_settings()
 
+
+def is_local_database_url(database_url: str) -> bool:
+    """Return True for local/dev databases where startup schema bootstrap is safe."""
+    try:
+        url = make_url(database_url)
+    except Exception:
+        return False
+    host = url.host
+    return host in {None, "", "localhost", "127.0.0.1", "::1"}
+
+
+def build_engine_url(database_url: str) -> str | URL:
+    """Normalize the SQLAlchemy URL for the configured runtime.
+
+    Supabase's transaction/pooled connections can reuse backend connections across
+    app connections. SQLAlchemy's asyncpg dialect caches prepared statements by
+    default, which can produce intermittent "prepared statement already exists" or
+    "does not exist" errors through a pooler. Disable that cache for remote
+    asyncpg URLs unless the operator explicitly set a value in the URL.
+    """
+    try:
+        url = make_url(database_url)
+    except Exception:
+        return database_url
+
+    if (
+        url.drivername == "postgresql+asyncpg"
+        and not is_local_database_url(database_url)
+        and "prepared_statement_cache_size" not in url.query
+    ):
+        return url.update_query_dict({"prepared_statement_cache_size": "0"})
+
+    return url
+
+
 _connect_args: dict = {}
-if "localhost" not in settings.database_url and "127.0.0.1" not in settings.database_url:
+if not is_local_database_url(settings.database_url):
     if settings.database_ssl_verify:
         _connect_args["ssl"] = _ssl.create_default_context(cafile=certifi.where())
     else:
@@ -23,7 +59,7 @@ if "localhost" not in settings.database_url and "127.0.0.1" not in settings.data
         _connect_args["ssl"] = ssl_context
 
 engine = create_async_engine(
-    settings.database_url,
+    build_engine_url(settings.database_url),
     echo=False,
     pool_size=10,
     max_overflow=20,

@@ -42,6 +42,7 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     database_ssl_verify: bool = Field(default=True, alias="DATABASE_SSL_VERIFY")
+    database_schema_bootstrap: bool = Field(default=False, alias="DATABASE_SCHEMA_BOOTSTRAP")
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_jwt_secret: str = Field(default="", alias="SUPABASE_JWT_SECRET")
     jwt_secret_key: str = Field(default="local-dev-secret", alias="JWT_SECRET_KEY")
