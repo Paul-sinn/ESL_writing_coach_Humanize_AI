@@ -17,6 +17,7 @@ async def create_tables() -> None:
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_hash VARCHAR(64)"))
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS full_name TEXT"))
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS full_name_hash VARCHAR(64)"))
+        await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS nickname VARCHAR(50)"))
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ"))
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ"))
         await conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onboarded_at TIMESTAMPTZ"))
@@ -28,6 +29,10 @@ async def create_tables() -> None:
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_profiles_full_name_hash "
             "ON profiles (full_name_hash)"
+        ))
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_profiles_nickname "
+            "ON profiles (nickname)"
         ))
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_profiles_deleted_at "
