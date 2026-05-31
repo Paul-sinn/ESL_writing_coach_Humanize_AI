@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -341,3 +342,65 @@ def test_create_checkout_url_surfaces_polar_network_error(monkeypatch, service):
 
     with pytest.raises(PolarCheckoutUpstreamError, match="connection refused"):
         asyncio.run(service.create_checkout_url("credit_pack_s"))
+
+
+def test_customer_state_sync_does_not_downgrade_paid_account_without_match(monkeypatch, service):
+    account = SimpleNamespace(
+        user_id="00000000-0000-0000-0000-000000000001",
+        subscription_status="student_plus",
+        credits_remaining=42000,
+        plan_name="Student Plus",
+        monthly_credit_limit=60000,
+        polar_subscription_id="sub_existing",
+    )
+    subscription = SimpleNamespace()
+
+    class FakeResult:
+        def __init__(self, value):
+            self.value = value
+
+        def scalar_one_or_none(self):
+            return self.value
+
+    class FakeDb:
+        def __init__(self):
+            self.values = [account, subscription]
+
+        async def execute(self, _statement):
+            return FakeResult(self.values.pop(0))
+
+    class FakeResponse:
+        status_code = 200
+        text = '{"active_subscriptions":[]}'
+
+        def json(self):
+            return {"active_subscriptions": []}
+
+    class FakeAsyncClient:
+        def __init__(self, timeout):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, headers):
+            return FakeResponse()
+
+    monkeypatch.setattr("backend.app.services.billing.settings.polar_access_token", "polar-token")
+    monkeypatch.setattr("backend.app.services.billing.httpx.AsyncClient", FakeAsyncClient)
+
+    synced = asyncio.run(
+        service.async_sync_from_polar_customer_state(
+            "00000000-0000-0000-0000-000000000001",
+            FakeDb(),
+        )
+    )
+
+    assert synced is False
+    assert account.subscription_status == "student_plus"
+    assert account.plan_name == "Student Plus"
+    assert account.monthly_credit_limit == 60000
+    assert account.polar_subscription_id == "sub_existing"

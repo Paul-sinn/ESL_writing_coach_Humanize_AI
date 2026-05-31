@@ -482,22 +482,6 @@ class BillingService:
             self._accounts[user_id] = UserAccount(user_id, new_status, account.credits_remaining)
             return True
 
-        if account.subscription_status != "free" or account.polar_subscription_id:
-            account.subscription_status = "free"
-            account.plan_name = "Free"
-            account.monthly_credit_limit = 0
-            account.polar_subscription_id = None
-            await self.async_sync_subscription(
-                user_id,
-                subscription_status="free",
-                plan_name="Free",
-                monthly_credit_limit=0,
-                polar_subscription_id=None,
-                db=db,
-            )
-            self._accounts[user_id] = UserAccount(user_id, "free", account.credits_remaining)
-            return True
-
         return False
 
     async def async_deduct_credits(self, user_id: str, amount: int, db: "AsyncSession") -> None:
