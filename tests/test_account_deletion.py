@@ -11,6 +11,7 @@ from backend.app.db.models import Profile, UserActivityLogDB
 from backend.app.main import app
 from backend.app.services import auth as auth_service
 from backend.app.services.auth import AuthUser
+from backend.app.services.billing import PolarCheckoutUpstreamError
 
 
 USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -63,20 +64,28 @@ def _override_db(fake_db):
 def test_delete_account_marks_profile_deleted_and_logs_activity(monkeypatch):
     profile = Profile(id=UUID(USER_ID), email="student@example.com")
     fake_db = FakeDb(profile)
+    account = SimpleNamespace(
+        subscription_status="student_plus",
+        plan_name="Student Plus",
+        monthly_credit_limit=60000,
+        credits_remaining=12000,
+        polar_subscription_id="sub_123",
+    )
+    revoked_subscription_ids = []
+    synced_payloads = []
 
     async def fake_get_or_create_account(*args, **kwargs):
-        return SimpleNamespace(
-            subscription_status="student_plus",
-            plan_name="Student Plus",
-            monthly_credit_limit=60000,
-            credits_remaining=12000,
-            polar_subscription_id="sub_123",
-        )
+        return account
+
+    async def fake_revoke_polar_subscription(subscription_id):
+        revoked_subscription_ids.append(subscription_id)
 
     async def fake_sync_subscription(*args, **kwargs):
+        synced_payloads.append(kwargs)
         return None
 
     monkeypatch.setattr("backend.app.main.billing_service.async_get_or_create_db_account", fake_get_or_create_account)
+    monkeypatch.setattr("backend.app.main.billing_service.revoke_polar_subscription", fake_revoke_polar_subscription)
     monkeypatch.setattr("backend.app.main.billing_service.async_sync_subscription", fake_sync_subscription)
     app.dependency_overrides[auth_service.get_current_user] = _auth_user
     app.dependency_overrides[get_db] = _override_db(fake_db)
@@ -93,6 +102,52 @@ def test_delete_account_marks_profile_deleted_and_logs_activity(monkeypatch):
     assert len(logs) == 1
     assert logs[0].event_type == "account_deleted"
     assert str(logs[0].user_id) == USER_ID
+    assert revoked_subscription_ids == ["sub_123"]
+    assert account.subscription_status == "free"
+    assert account.plan_name == "Free"
+    assert account.monthly_credit_limit == 0
+    assert account.credits_remaining == 0
+    assert account.polar_subscription_id is None
+    assert synced_payloads[-1]["polar_subscription_id"] is None
+
+
+def test_delete_account_stops_when_polar_revoke_fails(monkeypatch):
+    profile = Profile(id=UUID(USER_ID), email="student@example.com")
+    fake_db = FakeDb(profile)
+    account = SimpleNamespace(
+        subscription_status="student_plus",
+        plan_name="Student Plus",
+        monthly_credit_limit=60000,
+        credits_remaining=12000,
+        polar_subscription_id="sub_123",
+    )
+
+    async def fake_get_or_create_account(*args, **kwargs):
+        return account
+
+    async def fake_revoke_polar_subscription(subscription_id):
+        raise PolarCheckoutUpstreamError("polar unavailable", status_code=500)
+
+    async def fake_sync_subscription(*args, **kwargs):
+        raise AssertionError("local subscription should not be downgraded if Polar revoke fails")
+
+    monkeypatch.setattr("backend.app.main.billing_service.async_get_or_create_db_account", fake_get_or_create_account)
+    monkeypatch.setattr("backend.app.main.billing_service.revoke_polar_subscription", fake_revoke_polar_subscription)
+    monkeypatch.setattr("backend.app.main.billing_service.async_sync_subscription", fake_sync_subscription)
+    app.dependency_overrides[auth_service.get_current_user] = _auth_user
+    app.dependency_overrides[get_db] = _override_db(fake_db)
+    try:
+        response = TestClient(app).post("/api/auth/delete-account")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 502
+    assert "Polar subscription cancellation failed" in response.json()["detail"]
+    assert fake_db.committed is False
+    assert profile.deleted_at is None
+    assert not [item for item in fake_db.added if isinstance(item, UserActivityLogDB)]
+    assert account.subscription_status == "student_plus"
+    assert account.polar_subscription_id == "sub_123"
 
 
 def test_deleted_account_is_blocked_from_protected_api():

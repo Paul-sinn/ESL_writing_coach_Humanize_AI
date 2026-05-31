@@ -413,23 +413,32 @@ async def delete_account(
         await db.flush()
 
     if profile.deleted_at is None:
+        account = await billing_service.async_get_or_create_db_account(user_id, db)
+        if account.subscription_status != "free" and account.polar_subscription_id:
+            try:
+                await billing_service.revoke_polar_subscription(account.polar_subscription_id)
+            except (PolarCheckoutConfigError, PolarCheckoutUpstreamError) as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Polar subscription cancellation failed. Please try again or cancel in the customer portal first.",
+                ) from exc
         profile.deleted_at = datetime.now(timezone.utc)
         db.add(UserActivityLogDB(
             user_id=UUID(user_id),
             event_type="account_deleted",
             ip_address=request.client.host if request.client else None,
         ))
-        account = await billing_service.async_get_or_create_db_account(user_id, db)
         account.subscription_status = "free"
         account.plan_name = "Free"
         account.monthly_credit_limit = 0
         account.credits_remaining = 0
+        account.polar_subscription_id = None
         await billing_service.async_sync_subscription(
             user_id,
             subscription_status="free",
             plan_name="Free",
             monthly_credit_limit=0,
-            polar_subscription_id=account.polar_subscription_id,
+            polar_subscription_id=None,
             db=db,
         )
         billing_service._accounts.pop(user_id, None)

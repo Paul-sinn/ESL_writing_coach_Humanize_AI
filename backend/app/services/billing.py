@@ -314,6 +314,35 @@ class BillingService:
             raise PolarCheckoutUpstreamError("Polar customer session response did not include a portal URL.")
         return portal_url
 
+    async def revoke_polar_subscription(self, polar_subscription_id: str) -> None:
+        """Immediately revoke a Polar subscription during in-app account deletion."""
+        if not polar_subscription_id:
+            return
+        if not settings.polar_access_token:
+            raise PolarCheckoutConfigError("Polar access token is not configured.")
+
+        endpoint = _polar_api_url(f"/subscriptions/{quote(polar_subscription_id, safe='')}")
+        headers = {
+            "Authorization": f"Bearer {settings.polar_access_token}",
+            "Accept": "application/json",
+            "User-Agent": "pj-1-humanize-app/0.1 subscription-revoke",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.delete(endpoint, headers=headers)
+        except httpx.RequestError as exc:
+            detail = str(exc)
+            print(f"Polar subscription revoke request failed: {detail}")
+            raise PolarCheckoutUpstreamError(detail) from exc
+
+        if response.status_code == 404:
+            # Polar no longer has this subscription; allow local deletion cleanup to continue.
+            return
+        if response.status_code >= 400:
+            detail = response.text
+            print(f"Polar subscription revoke failed ({response.status_code}): {detail}")
+            raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
+
     # ── Async DB methods (real users only) ────────────────────────────────────
 
     async def async_get_or_create_db_account(self, user_id: str, db: "AsyncSession") -> "_UserAccountDBModel":
