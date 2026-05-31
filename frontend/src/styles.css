@@ -971,6 +971,22 @@ textarea:focus {
   box-shadow: 0 0 0 4px rgba(138, 180, 216, 0.16);
 }
 
+html.dark textarea {
+  background: rgba(16, 16, 28, 0.84);
+  color: var(--ink);
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html.dark textarea::placeholder {
+  color: #6f7890;
+}
+
+html.dark textarea:focus {
+  border-color: rgba(107, 155, 210, 0.58);
+  box-shadow: 0 0 0 4px rgba(107, 155, 210, 0.18);
+}
+
 .word-counter {
   margin-top: 10px;
   font-size: 0.94rem;
@@ -1626,6 +1642,18 @@ html.dark .signal-list span {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px;
+}
+
+html.dark .coach-select {
+  background-color: rgba(16, 16, 28, 0.86);
+  color: var(--ink);
+  border-color: rgba(255, 255, 255, 0.13);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238bb4d9' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+html.dark .coach-select option {
+  background: #141420;
+  color: var(--ink);
 }
 
 /* ── Depth selector ── */

@@ -17,12 +17,6 @@ const ASSIGNMENT_TYPES = [
   { value: "personal_statement", label: "Personal Statement" },
 ];
 
-const WRITING_LEVELS = [
-  { value: "esl_beginner", label: "ESL Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced" },
-];
-
 const DEPTH_OPTIONS = [
   { value: "basic", label: "Quick Check", costPerWord: 1, minCredits: 500, description: "Top 3 issues" },
   { value: "deep", label: "Deep Feedback", costPerWord: 2, minCredits: 1200, description: "Full analysis" },
@@ -131,7 +125,6 @@ export default function App() {
   }, [showEditor]);
   const [text, setText] = useState("");
   const [assignmentType, setAssignmentType] = useState("general_academic");
-  const [writingLevel, setWritingLevel] = useState("intermediate");
   const [depth, setDepth] = useState("deep");
   const [result, setResult] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(true);
@@ -289,7 +282,11 @@ export default function App() {
       const data = await fetchJson("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, assignment_type: assignmentType, writing_level: writingLevel, depth }),
+        body: JSON.stringify({
+          text,
+          assignment_type: assignmentType,
+          depth,
+        }),
       });
       setResult(data);
       setFeedbackOpen(true);
@@ -995,7 +992,7 @@ export default function App() {
               <div className="requirements-card">
                 <div className="requirements-header">
                   <h3>Options</h3>
-                  <p>Choose your assignment type, level, and feedback depth.</p>
+                  <p>Choose your assignment type and feedback depth.</p>
                 </div>
 
                 <div className="coach-selects">
@@ -1005,15 +1002,6 @@ export default function App() {
                       onChange={(e) => setAssignmentType(e.target.value)}>
                       {ASSIGNMENT_TYPES.map((t) => (
                         <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="select-group">
-                    <label className="select-label">Writing Level</label>
-                    <select className="coach-select" value={writingLevel}
-                      onChange={(e) => setWritingLevel(e.target.value)}>
-                      {WRITING_LEVELS.map((l) => (
-                        <option key={l.value} value={l.value}>{l.label}</option>
                       ))}
                     </select>
                   </div>
