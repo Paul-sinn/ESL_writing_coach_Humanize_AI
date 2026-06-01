@@ -102,6 +102,19 @@ function Collapsible({ label, defaultOpen = true, children }) {
   );
 }
 
+function HelpTip({ label, children }) {
+  return (
+    <span className="help-tip">
+      <button className="help-tip-trigger" type="button" aria-label={label}>
+        ?
+      </button>
+      <span className="help-tip-bubble" role="tooltip">
+        {children}
+      </span>
+    </span>
+  );
+}
+
 function ScoreCard({ label, score, invert = false }) {
   const raw = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
   const colorClass = invert
@@ -997,7 +1010,12 @@ export default function App() {
 
                 <div className="coach-selects">
                   <div className="select-group">
-                    <label className="select-label">Assignment Type</label>
+                    <div className="label-with-help">
+                      <label className="select-label">Assignment Type</label>
+                      <HelpTip label="What assignment type means">
+                        Pick the format closest to your paper so feedback matches the assignment style.
+                      </HelpTip>
+                    </div>
                     <select className="coach-select" value={assignmentType}
                       onChange={(e) => setAssignmentType(e.target.value)}>
                       {ASSIGNMENT_TYPES.map((t) => (
@@ -1007,6 +1025,12 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="label-with-help depth-label-row">
+                  <span className="select-label">Feedback Depth</span>
+                  <HelpTip label="What feedback depth means">
+                    Choose how detailed the review should be. Deeper checks use more credits.
+                  </HelpTip>
+                </div>
                 <div className="depth-row">
                   {DEPTH_OPTIONS.map((opt) => (
                     <button key={opt.value} type="button"
