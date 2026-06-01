@@ -340,7 +340,7 @@ export default function App() {
 
   async function startCheckout(productCode) {
     if (!user) {
-      setError("결제를 진행하려면 먼저 로그인해주세요.");
+      setError("Please log in before continuing to checkout.");
       openAuth("login");
       return false;
     }
@@ -354,13 +354,13 @@ export default function App() {
         }),
       });
       if (!data?.checkout_url) {
-        throw new Error("결제 페이지 URL을 받지 못했습니다.");
+        throw new Error("The checkout page URL was not returned.");
       }
       window.location.href = data.checkout_url;
       return true;
     } catch (err) {
       console.error("[Checkout] API error:", err);
-      setError(err.message ?? "결제 페이지 이동에 실패했습니다.");
+      setError(err.message ?? "Could not open the checkout page.");
       return false;
     } finally {
       setCheckoutLoading(null);
@@ -646,7 +646,7 @@ export default function App() {
       {/* ── Payment success banner ── */}
       {paymentSuccess && (
         <div className="payment-success-banner" onClick={() => setPaymentSuccess(false)}>
-          결제가 완료되었습니다! 플랜이 업그레이드되었어요. ✓
+          Payment complete! Your plan has been upgraded. ✓
           <span className="payment-success-dismiss">✕</span>
         </div>
       )}

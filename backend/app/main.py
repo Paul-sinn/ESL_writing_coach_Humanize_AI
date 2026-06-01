@@ -471,7 +471,7 @@ async def billing_checkout(
                     return_url=payload.success_url,
                 )
             except (PolarCheckoutConfigError, PolarCheckoutUpstreamError) as exc:
-                raise HTTPException(status_code=502, detail="Polar 고객 포털 생성에 실패했습니다.") from exc
+                raise HTTPException(status_code=502, detail="Failed to create the Polar customer portal.") from exc
             return CheckoutResponse(
                 checkout_url=portal_url,
                 message="Redirect the user to manage their existing subscription.",
@@ -512,7 +512,7 @@ async def billing_checkout(
                     checkout_url=portal_url,
                     message="Redirect the user to manage their existing subscription.",
                 )
-        raise HTTPException(status_code=502, detail="Polar checkout 생성에 실패했습니다.") from exc
+        raise HTTPException(status_code=502, detail="Failed to create the Polar checkout.") from exc
     return CheckoutResponse(
         checkout_url=checkout_url,
         message="Redirect the user to complete checkout.",

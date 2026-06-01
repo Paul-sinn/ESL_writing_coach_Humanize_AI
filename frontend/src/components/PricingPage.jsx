@@ -67,10 +67,10 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
             const isDowngrade = planIdx < currentIdx;
             const isPlanChange = !isCurrent;
             const actionLabel = plan.statusKey === "free"
-              ? "구독 취소 관리"
+              ? "Manage subscription"
               : isDowngrade
-                ? "다운그레이드 관리 →"
-                : "업그레이드 →";
+                ? "Manage downgrade →"
+                : "Upgrade →";
 
             return (
               <div key={plan.name} className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`}>
@@ -89,19 +89,19 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
                 </ul>
 
                 {isCurrent ? (
-                  <div className="pricing-current-badge">현재 플랜</div>
+                  <div className="pricing-current-badge">Current plan</div>
                 ) : isPlanChange ? (
                   <button
                     className={`pricing-upgrade-btn${plan.featured ? " pricing-upgrade-btn-primary" : ""}`}
                     onClick={() => onCheckout(plan.code)}
                     disabled={loading === plan.code}
                   >
-                    {loading === plan.code ? "이동 중…" : actionLabel}
+                    {loading === plan.code ? "Redirecting…" : actionLabel}
                   </button>
                 ) : currentStatus === "free" && plan.statusKey === "free" ? (
-                  <button className="pricing-upgrade-btn pricing-upgrade-btn-muted" onClick={onClose}>무료로 시작</button>
+                  <button className="pricing-upgrade-btn pricing-upgrade-btn-muted" onClick={onClose}>Start for free</button>
                 ) : (
-                  <div className="pricing-current-badge">현재 플랜</div>
+                  <div className="pricing-current-badge">Current plan</div>
                 )}
               </div>
             );
@@ -109,8 +109,8 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
         </div>
 
         <div className="pricing-packs-section">
-          <h3>크레딧 팩 — 일회성 구매</h3>
-          <p>구독 없이도 사용 가능. 크레딧 만료 없음.</p>
+          <h3>Credit packs — one-time purchase</h3>
+          <p>Use them without a subscription. Credits do not expire.</p>
           <div className="pricing-packs-row">
             {CREDIT_PACKS.map((pack) => (
               <button
@@ -128,7 +128,7 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
         </div>
 
         <p className="pricing-disclaimer">
-          이 서비스는 자연스러운 영어 작문을 돕는 코치입니다. AI 감지 우회나 Turnitin 회피를 보장하지 않습니다.
+          This service coaches clearer, more natural English writing. It does not guarantee AI detector or Turnitin bypass.
         </p>
       </div>
     </div>
