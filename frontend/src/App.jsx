@@ -157,7 +157,7 @@ export default function App() {
   const [preserveCitations, setPreserveCitations] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(false);
 
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") !== "false");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "google" | "verify"
   const [authEmail, setAuthEmail] = useState("");
@@ -613,15 +613,6 @@ export default function App() {
                     {accountDeleting ? "Deleting..." : "Delete account"}
                   </button>
                 )}
-                <div className="pd-item pd-item-toggle" onClick={() => setDarkMode(d => !d)}>
-                  <span className="pd-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  </span>
-                  <span className="pd-item-label">Dark mode</span>
-                  <div className={`pd-toggle ${darkMode ? "on" : ""}`}>
-                    <div className="pd-toggle-knob" />
-                  </div>
-                </div>
                 <a className="pd-item" href="/help.html" target="_blank" rel="noopener" onClick={() => setProfileOpen(false)}>
                   <span className="pd-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -652,6 +643,25 @@ export default function App() {
                 </div>
               )}
             </div>
+            <button
+              className="topnav-theme-toggle"
+              type="button"
+              onClick={() => setDarkMode(d => !d)}
+              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-pressed={darkMode}
+              title={darkMode ? "Light mode" : "Dark mode"}
+            >
+              {darkMode ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </button>
           </nav>
         </div>
       </header>
