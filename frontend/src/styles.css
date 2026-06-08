@@ -330,6 +330,12 @@ html.dark .topnav-theme-toggle:hover {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.nav-credits-loading {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(138, 180, 216, 0.28);
+}
+
 .workspace {
   display: grid;
   gap: 20px;
@@ -1104,6 +1110,28 @@ button:disabled {
   padding: 18px;
   position: sticky;
   top: 88px;
+}
+
+.billing-loading-panel {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 18px;
+  padding: 13px 15px;
+  border: 1px solid rgba(138, 180, 216, 0.32);
+  border-radius: 12px;
+  background: rgba(138, 180, 216, 0.12);
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.billing-loading-panel span {
+  color: var(--muted);
+}
+
+.billing-loading-panel-error {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .requirements-header {

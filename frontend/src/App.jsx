@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import LandingPage from "./components/LandingPage";
@@ -208,6 +208,8 @@ export default function App() {
   const [feedbackOpen, setFeedbackOpen] = useState(true);
   const [humanizeOpen, setHumanizeOpen] = useState(true);
   const [billing, setBilling] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingLoadFailed, setBillingLoadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -251,17 +253,6 @@ export default function App() {
     localStorage.setItem("darkMode", darkMode);
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("payment_success") === "1") {
-      window.history.replaceState({}, "", window.location.pathname);
-      setPaymentSuccess(true);
-      if (user) {
-        fetchJson("/api/billing/status").then(setBilling).catch(() => null);
-      }
-    }
-  }, [user]);
 
   const resultRef = useRef(null);
   const humanizeResultRef = useRef(null);
@@ -315,6 +306,8 @@ export default function App() {
   const usageExhausted = !isFreePlan && usageLimit > 0 && usagePercent >= 100;
   const authModalLocked = onboardingRequired;
   const canShowWorkspace = showEditor && !authStateLoading && !onboardingRequired;
+  const billingStatusPending = Boolean(user) && (billingLoading || (!billing && !billingLoadFailed));
+  const billingStatusUnavailable = Boolean(user) && !billingLoading && billingLoadFailed;
 
   const selectedDepth = DEPTH_OPTIONS.find((d) => d.value === depth);
   const feedbackCost = isFreePlan ? 0 : Math.max(
@@ -322,7 +315,7 @@ export default function App() {
     selectedDepth?.minCredits ?? 1200,
   );
   const humanizeCost = isFreePlan ? 0 : Math.max(wordCount * HUMANIZE_COST_PER_WORD, HUMANIZE_MIN_CREDITS);
-  const canSubmit = text.trim() && !overLimit && !loading && !humanizeLoading;
+  const canSubmit = text.trim() && !overLimit && !loading && !humanizeLoading && !billingStatusPending && !billingStatusUnavailable;
   const feedbackItems = result?.feedback_items ?? [];
   const feedbackHighlights = buildFeedbackHighlights(text, feedbackItems);
   const selectedFeedback = feedbackItems[selectedFeedbackIndex] ?? feedbackItems[0];
@@ -376,15 +369,39 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
+  const refreshBilling = useCallback(async () => {
     if (!user) {
       setBilling(null);
-      return;
+      setBillingLoading(false);
+      setBillingLoadFailed(false);
+      return null;
     }
-    fetchJson("/api/billing/status")
-      .then(setBilling)
-      .catch(() => setBilling(null));
+    setBillingLoading(true);
+    setBillingLoadFailed(false);
+    try {
+      const data = await fetchJson("/api/billing/status");
+      setBilling(data);
+      return data;
+    } catch {
+      setBilling(null);
+      setBillingLoadFailed(true);
+      return null;
+    } finally {
+      setBillingLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    refreshBilling();
+  }, [refreshBilling]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment_success") !== "1") return;
+    window.history.replaceState({}, "", window.location.pathname);
+    setPaymentSuccess(true);
+    if (user) refreshBilling();
+  }, [user, refreshBilling]);
 
   useEffect(() => {
     if (!usageExhausted) return;
@@ -404,7 +421,7 @@ export default function App() {
   }, [showEditor, user, authStateLoading]);
 
   useEffect(() => {
-    if (!onboardingRequired) return;
+    if (!onboardingRequired || !user) return;
     setAuthMode("google");
     setAuthUsername("");
     setUsernameAvail(null);
@@ -432,7 +449,7 @@ export default function App() {
       setSelectedFeedbackIndex(0);
       setCoachFeedback(data.feedback_items?.length ? data.feedback_items : null);
       if (data.billing_redirect) setError(data.billing_redirect.message);
-      setBilling(await fetchJson("/api/billing/status"));
+      await refreshBilling();
     } catch (err) {
       if (err.status === 429 && err.detail) {
         setLimitNotice(err.detail);
@@ -467,7 +484,7 @@ export default function App() {
       setHumanizeOpen(true);
       setSelectedHumanizeChangeIndex(0);
       if (data.billing_redirect) setError(data.billing_redirect.message);
-      setBilling(await fetchJson("/api/billing/status"));
+      await refreshBilling();
     } catch (err) {
       if (err.status === 429 && err.detail) {
         setLimitNotice(err.detail);
@@ -647,6 +664,18 @@ export default function App() {
     }
   }
 
+  function handleStartFree() {
+    if (authStateLoading) {
+      setShowEditor(true);
+      return;
+    }
+    if (!user) {
+      openAuth("login");
+      return;
+    }
+    setShowEditor(true);
+  }
+
   const planInitial = user
     ? (user.user_metadata?.full_name || user.email)[0].toUpperCase()
     : (billing?.plan_name ?? "F")[0].toUpperCase();
@@ -687,6 +716,12 @@ export default function App() {
               }`}>
                 <span className="nav-plan-name">{billing.plan_name}</span>
                 <span className="nav-credit-count">{billing.credits_remaining.toLocaleString()} cr</span>
+              </div>
+            )}
+            {billingStatusPending && (
+              <div className="nav-credits nav-credits-loading">
+                <span className="nav-plan-name">Loading plan</span>
+                <span className="nav-credit-count">credits...</span>
               </div>
             )}
             <button className="topnav-cta" onClick={() => setShowPricing(true)}>
@@ -1086,7 +1121,7 @@ export default function App() {
       {/* ── Hero landing page ── */}
       {!showEditor && (
         <LandingPage
-          onStart={() => setShowEditor(true)}
+          onStart={handleStartFree}
           onUpgrade={() => setShowPricing(true)}
         />
       )}
@@ -1129,6 +1164,19 @@ export default function App() {
                 <h2>Paste your essay below.</h2>
               </div>
             </div>
+
+            {billingStatusPending && (
+              <div className="billing-loading-panel">
+                <strong>Loading your plan and remaining credits...</strong>
+                <span>This usually takes a few seconds after login or payment. Writing tools unlock automatically when it finishes.</span>
+              </div>
+            )}
+            {billingStatusUnavailable && (
+              <div className="billing-loading-panel billing-loading-panel-error">
+                <strong>Could not load your plan yet.</strong>
+                <span>Refresh the page before running a new analysis so credits are counted correctly.</span>
+              </div>
+            )}
 
             <div className="editor-grid">
               <div className="input-panel">
@@ -1202,7 +1250,7 @@ export default function App() {
                 <div className="dual-action-row">
                   <button className="btn-feedback" disabled={!canSubmit} onClick={handleCoach}>
                     <span className="btn-action-title">
-                      {loading ? "Analyzing..." : "Get Feedback"}
+                      {billingStatusPending ? "Loading plan..." : loading ? "Analyzing..." : "Get Feedback"}
                     </span>
                     <span className="btn-action-cost">
                       {isFreePlan ? "Free · 300 words" : `~${feedbackCost.toLocaleString()} cr`}
@@ -1210,7 +1258,9 @@ export default function App() {
                   </button>
                   <button className="btn-humanize-action" disabled={!canSubmit} onClick={() => setShowHumanizeModal(true)}>
                     <span className={`btn-action-title${humanizeLoading ? "" : " stacked"}`}>
-                      {humanizeLoading ? (
+                      {billingStatusPending ? (
+                        "Loading credits..."
+                      ) : humanizeLoading ? (
                         "Humanizing..."
                       ) : (
                         <>
