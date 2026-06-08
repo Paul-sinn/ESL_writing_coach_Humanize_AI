@@ -22,9 +22,11 @@ class _FakeCompletions:
     def __init__(self, payloads: list[dict]) -> None:
         self.payloads = payloads
         self.calls = 0
+        self.kwargs: list[dict] = []
 
     def create(self, **kwargs):
         self.calls += 1
+        self.kwargs.append(kwargs)
         return _Response(self.payloads[self.calls - 1])
 
 
@@ -127,3 +129,46 @@ def test_rewrite_returns_original_short_result_when_repair_does_not_improve_leng
 
     assert client.completions.calls == 2
     assert result["rewritten_text"] == "too short rewrite"
+
+
+def test_rewrite_korean_input_instructs_korean_output():
+    original = "저는 수업에서 배운 내용을 바탕으로 이 글을 썼습니다. 제 경험도 함께 설명하고 싶습니다."
+    service, client = _service_with_payloads([
+        {
+            "rewritten_text": "저는 수업에서 배운 내용을 바탕으로 이 글을 썼습니다. 제 경험도 함께 더 자연스럽게 설명하고 싶습니다.",
+            "summary_of_changes": "문장을 더 자연스럽게 다듬었습니다.",
+            "key_improvements": ["한국어 문체를 유지했습니다."],
+        }
+    ])
+
+    service.rewrite(
+        original,
+        tone="natural_student",
+        strength="balanced",
+        preserve_meaning=True,
+        preserve_citations=False,
+        preserve_structure=False,
+        model="gpt-4o",
+    )
+
+    system_prompt = client.completions.kwargs[0]["messages"][0]["content"]
+    assert "OUTPUT LANGUAGE: Korean" in system_prompt
+    assert "Do not translate the essay into English" in system_prompt
+
+
+def test_fallback_rewrite_korean_input_returns_korean_metadata():
+    service = HumanizeModelService()
+    service._client = None
+
+    result = service.rewrite(
+        "저는 제 경험을 통해 이 주제를 이해하게 되었습니다.",
+        tone="natural_student",
+        strength="balanced",
+        preserve_meaning=True,
+        preserve_citations=False,
+        preserve_structure=False,
+        model="gpt-4o",
+    )
+
+    assert "다듬었습니다" in result["summary_of_changes"]
+    assert result["key_improvements"][0].startswith("딱딱한")

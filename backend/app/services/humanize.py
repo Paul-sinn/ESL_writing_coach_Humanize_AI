@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from ..config import get_settings
-from ..utils.text import count_words, normalize_whitespace
+from ..utils.text import count_words, detect_output_language, normalize_whitespace
 
 
 settings = get_settings()
@@ -75,6 +75,19 @@ def _punctuation_rule(tone: str, persona: str) -> str:
     )
 
 
+def _language_instruction(text: str) -> str:
+    output_language = detect_output_language(text)
+    if output_language == "Korean":
+        return (
+            "OUTPUT LANGUAGE: Korean. Rewrite Korean essays in natural Korean, not English. "
+            "All JSON string values, including summary_of_changes and key_improvements, must be in Korean. "
+            "Do not translate the essay into English."
+        )
+    return (
+        "OUTPUT LANGUAGE: English. All JSON string values should be in English unless the original essay clearly uses another language."
+    )
+
+
 class HumanizeModelService:
     def __init__(self) -> None:
         self._client = OpenAI(api_key=settings.openai_api_key) if (settings.openai_api_key and OpenAI) else None
@@ -82,12 +95,14 @@ class HumanizeModelService:
     def analyze_for_rewrite(self, text: str, tone: str, strength: str, model: str) -> dict[str, Any]:
         if not self._client:
             return {}
+        language_instruction = _language_instruction(text)
         prompt = (
             "You are an expert writing analyst. Analyze the essay and identify:\n\n"
             "1. AI-LIKE PATTERNS: Specific phrases or sentences that sound AI-generated\n"
             "2. REWRITE TARGETS: The 3-5 most important sentences to improve naturalness\n"
             "3. TONE ISSUES: Overall tone problems (e.g. 'too formal', 'uniform sentence length')\n\n"
             f"Target tone: {tone}, Rewrite strength: {strength}\n\n"
+            f"{language_instruction}\n\n"
             "Return ONLY valid JSON:\n"
             '{"patterns_found": ["phrase1", ...], '
             '"rewrite_targets": ["sentence1", ...], '
@@ -137,6 +152,7 @@ class HumanizeModelService:
         persona_instr = PERSONA_INSTRUCTIONS.get(persona, PERSONA_INSTRUCTIONS["esl_student"])
         punct_rule = _punctuation_rule(tone, persona)
         preserve_instr = " ".join(preserve_notes) if preserve_notes else ""
+        language_instruction = _language_instruction(text)
 
         analysis_block = ""
         if analysis:
@@ -149,6 +165,7 @@ class HumanizeModelService:
 
         prompt = (
             "You are rewriting a student essay to sound more natural and less AI-generated.\n\n"
+            f"{language_instruction}\n\n"
             f"WRITER PERSONA: {persona_instr}\n\n"
             f"{analysis_block}"
             f"TONE: {tone_instr}\n\n"
@@ -223,6 +240,7 @@ class HumanizeModelService:
 
         repair_prompt = (
             "You are revising an essay rewrite that became too short.\n\n"
+            f"{_language_instruction(original_text)}\n\n"
             f"The original essay was {original_word_count} words. "
             f"Expand the current rewrite naturally so it is at least {original_word_count} words "
             f"and no more than about {target_max_words} words.\n"
@@ -262,6 +280,7 @@ class HumanizeModelService:
         return result
 
     def _fallback_rewrite(self, text: str) -> dict[str, Any]:
+        is_korean = detect_output_language(text) == "Korean"
         sentences = [segment.strip() for segment in text.split(".") if segment.strip()]
         rewritten = ". ".join([
             sentence
@@ -277,11 +296,22 @@ class HumanizeModelService:
             rewritten += "."
         return {
             "rewritten_text": normalize_whitespace(rewritten or text),
-            "summary_of_changes": "Adjusted transitions and loosened sentence rhythm to sound less formulaic.",
-            "key_improvements": [
-                "Replaced AI transition phrases with natural connectors",
-                "Reduced overly formal phrasing",
-            ],
+            "summary_of_changes": (
+                "전환 표현과 문장 리듬을 더 자연스럽게 다듬었습니다."
+                if is_korean else
+                "Adjusted transitions and loosened sentence rhythm to sound less formulaic."
+            ),
+            "key_improvements": (
+                [
+                    "딱딱한 전환 표현을 더 자연스러운 연결로 바꿨습니다.",
+                    "지나치게 공식적인 문체를 줄였습니다.",
+                ]
+                if is_korean else
+                [
+                    "Replaced AI transition phrases with natural connectors",
+                    "Reduced overly formal phrasing",
+                ]
+            ),
         }
 
 

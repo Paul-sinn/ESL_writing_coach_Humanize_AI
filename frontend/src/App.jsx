@@ -129,6 +129,60 @@ function ScoreCard({ label, score, invert = false }) {
   );
 }
 
+function normalizeForCompare(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[“”"']/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitSentences(value) {
+  return String(value ?? "").match(/[^.!?\n]+[.!?]+|[^.!?\n]+/g)?.filter((part) => part.trim()) ?? [];
+}
+
+function splitReviewBlocks(value) {
+  const paragraphs = String(value ?? "").split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  if (paragraphs.length > 1) return paragraphs;
+  return splitSentences(value).map((part) => part.trim()).filter(Boolean);
+}
+
+function buildFeedbackHighlights(sourceText, feedbackItems) {
+  const sentences = splitSentences(sourceText);
+  const unusedIndexes = new Set(feedbackItems.map((_, index) => index));
+  return sentences.map((sentence) => {
+    const normalizedSentence = normalizeForCompare(sentence);
+    let matchedIndex = -1;
+    for (const index of unusedIndexes) {
+      const normalizedIssue = normalizeForCompare(feedbackItems[index]?.sentence);
+      if (!normalizedIssue) continue;
+      if (normalizedSentence.includes(normalizedIssue) || normalizedIssue.includes(normalizedSentence)) {
+        matchedIndex = index;
+        break;
+      }
+    }
+    if (matchedIndex >= 0) unusedIndexes.delete(matchedIndex);
+    return { text: sentence, feedbackIndex: matchedIndex };
+  });
+}
+
+function buildHumanizeChanges(originalText, rewrittenText, improvements = []) {
+  const originalBlocks = splitReviewBlocks(originalText);
+  const rewrittenBlocks = splitReviewBlocks(rewrittenText);
+  const count = Math.max(originalBlocks.length, rewrittenBlocks.length);
+  return Array.from({ length: count }, (_, index) => {
+    const original = originalBlocks[index] ?? "";
+    const rewritten = rewrittenBlocks[index] ?? "";
+    return {
+      original,
+      rewritten,
+      changed: normalizeForCompare(original) !== normalizeForCompare(rewritten),
+      reason: improvements[index] ?? "Wording, rhythm, or sentence flow changed here.",
+    };
+  }).filter((change) => change.original || change.rewritten);
+}
+
 export default function App() {
   const { user, loading: authStateLoading, onboardingRequired, signInWithGoogle, signInWithPassword, signInWithDemo, signUp: supabaseSignUp, signOut: supabaseSignOut, deleteAccount, completeOnboarding, demoEmail, demoPassword } = useAuth();
   const [showEditor, setShowEditor] = useState(() => localStorage.getItem("showEditor") === "true");
@@ -153,6 +207,8 @@ export default function App() {
   const [humanizeStrength, setHumanizeStrength] = useState("balanced");
   const [humanizePersona, setHumanizePersona] = useState("esl_student");
   const [coachFeedback, setCoachFeedback] = useState(null);
+  const [selectedFeedbackIndex, setSelectedFeedbackIndex] = useState(0);
+  const [selectedHumanizeChangeIndex, setSelectedHumanizeChangeIndex] = useState(0);
   const [preserveMeaning, setPreserveMeaning] = useState(true);
   const [preserveCitations, setPreserveCitations] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(false);
@@ -249,6 +305,13 @@ export default function App() {
   );
   const humanizeCost = isFreePlan ? 0 : Math.max(wordCount * HUMANIZE_COST_PER_WORD, HUMANIZE_MIN_CREDITS);
   const canSubmit = text.trim() && !overLimit && !loading && !humanizeLoading;
+  const feedbackItems = result?.feedback_items ?? [];
+  const feedbackHighlights = buildFeedbackHighlights(text, feedbackItems);
+  const selectedFeedback = feedbackItems[selectedFeedbackIndex] ?? feedbackItems[0];
+  const humanizeChanges = humanizeResult && !humanizeResult.billing_redirect
+    ? buildHumanizeChanges(text, humanizeResult.rewritten_text, humanizeResult.key_improvements)
+    : [];
+  const selectedHumanizeChange = humanizeChanges[selectedHumanizeChangeIndex] ?? humanizeChanges.find((change) => change.changed);
 
   useEffect(() => {
     if (!user) {
@@ -303,6 +366,7 @@ export default function App() {
       });
       setResult(data);
       setFeedbackOpen(true);
+      setSelectedFeedbackIndex(0);
       setCoachFeedback(data.feedback_items?.length ? data.feedback_items : null);
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
@@ -338,6 +402,7 @@ export default function App() {
       });
       setHumanizeResult(data);
       setHumanizeOpen(true);
+      setSelectedHumanizeChangeIndex(0);
       if (data.billing_redirect) setError(data.billing_redirect.message);
       setBilling(await fetchJson("/api/billing/status"));
     } catch (err) {
@@ -1130,21 +1195,67 @@ export default function App() {
 
                   {result.feedback_items.length > 0 && (
                     <Collapsible label="Writing Issues">
-                      {result.feedback_items.map((item, i) => (
-                        <div key={i} className={`feedback-item issue-${item.issue_type}`}>
-                          <div className="feedback-header">
-                            <span className="issue-badge">{ISSUE_LABELS[item.issue_type] ?? item.issue_type}</span>
-                            <span className={`severity-badge severity-${item.severity}`}>
-                              {item.severity?.toUpperCase()}
-                            </span>
-                          </div>
-                          <blockquote className="feedback-quote">"{item.sentence}"</blockquote>
-                          <p className="feedback-explanation">{item.explanation}</p>
-                          <div className="feedback-suggestion">
-                            <span className="suggestion-label">Try this:</span> {item.suggestion}
+                      <div className="review-workspace">
+                        <div className="essay-evidence-panel">
+                          <div className="compare-label">Original essay</div>
+                          <div className="essay-highlight-text">
+                            {feedbackHighlights.map((part, i) => {
+                              const isIssue = part.feedbackIndex >= 0;
+                              const isActive = part.feedbackIndex === selectedFeedbackIndex;
+                              return isIssue ? (
+                                <button
+                                  key={`${part.text}-${i}`}
+                                  type="button"
+                                  className={`essay-highlight${isActive ? " active" : ""}`}
+                                  onClick={() => setSelectedFeedbackIndex(part.feedbackIndex)}
+                                >
+                                  {part.text}
+                                </button>
+                              ) : (
+                                <span key={`${part.text}-${i}`}>{part.text}</span>
+                              );
+                            })}
                           </div>
                         </div>
-                      ))}
+                        <div className="feedback-detail-panel">
+                          {selectedFeedback && (
+                            <div className={`feedback-item active issue-${selectedFeedback.issue_type}`}>
+                              <div className="feedback-header">
+                                <span className="issue-badge">{ISSUE_LABELS[selectedFeedback.issue_type] ?? selectedFeedback.issue_type}</span>
+                                <span className={`severity-badge severity-${selectedFeedback.severity}`}>
+                                  {selectedFeedback.severity?.toUpperCase()}
+                                </span>
+                              </div>
+                              <blockquote className="feedback-quote">"{selectedFeedback.sentence}"</blockquote>
+                              <p className="feedback-explanation">{selectedFeedback.explanation}</p>
+                              {selectedFeedback.why_it_matters && (
+                                <p className="feedback-why">{selectedFeedback.why_it_matters}</p>
+                              )}
+                              <div className="feedback-suggestion">
+                                <span className="suggestion-label">Try this:</span> {selectedFeedback.suggestion}
+                              </div>
+                              {selectedFeedback.suggested_revision && (
+                                <div className="feedback-revision">
+                                  <span className="suggestion-label">Example revision:</span> {selectedFeedback.suggested_revision}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="feedback-index-list">
+                            {result.feedback_items.map((item, i) => (
+                              <button
+                                key={`${item.sentence}-${i}`}
+                                type="button"
+                                className={`feedback-index-btn${i === selectedFeedbackIndex ? " active" : ""}`}
+                                onClick={() => setSelectedFeedbackIndex(i)}
+                              >
+                                <span>{i + 1}</span>
+                                <strong>{ISSUE_LABELS[item.issue_type] ?? item.issue_type}</strong>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </Collapsible>
                   )}
 
@@ -1180,16 +1291,43 @@ export default function App() {
               </button>
               {humanizeOpen && (
                 <>
-                  <div className="compare-grid">
-                    <div>
+                  <div className="compare-grid humanize-review-grid">
+                    <div className="essay-evidence-panel">
                       <div className="compare-label">Original</div>
-                      <div className="compare-text">{text}</div>
+                      <div className="compare-text">
+                        {humanizeChanges.map((change, i) => (
+                          <button
+                            key={`original-${i}`}
+                            type="button"
+                            className={`change-block${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
+                            onClick={() => setSelectedHumanizeChangeIndex(i)}
+                          >
+                            {change.original || "No matching original block."}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
+                    <div className="essay-evidence-panel">
                       <div className="compare-label">Humanized</div>
-                      <div className="compare-text">{humanizeResult.rewritten_text}</div>
+                      <div className="compare-text">
+                        {humanizeChanges.map((change, i) => (
+                          <button
+                            key={`rewritten-${i}`}
+                            type="button"
+                            className={`change-block${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
+                            onClick={() => setSelectedHumanizeChangeIndex(i)}
+                          >
+                            {change.rewritten || "Removed in rewrite."}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+                  {selectedHumanizeChange && (
+                    <div className="change-reason-panel">
+                      <span className="suggestion-label">What changed:</span> {selectedHumanizeChange.reason}
+                    </div>
+                  )}
                   {humanizeResult.key_improvements?.length > 0 && (
                     <Collapsible label="Key improvements">
                       <ul className="improvements-list">

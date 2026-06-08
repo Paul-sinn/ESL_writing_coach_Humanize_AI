@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from ..config import get_settings
+from ..utils.text import detect_output_language, split_sentences
 
 settings = get_settings()
 
@@ -58,19 +59,28 @@ class CoachingService:
         model: str,
     ) -> dict[str, Any]:
         if not self._client:
-            return self._fallback_coaching(text)
+            return self._fallback_coaching(text, depth)
 
         assignment_label = ASSIGNMENT_LABELS.get(assignment_type, "Academic writing")
         level_label = LEVEL_LABELS.get(writing_level, "Intermediate")
+        output_language = detect_output_language(text)
 
         if depth == "basic":
-            depth_instruction = "Identify up to 3 key issues. Keep explanations brief."
+            depth_instruction = (
+                "Quick Check: identify exactly the top 3 highest-impact issues only. "
+                "Keep explanations brief and prioritize what the student should fix first."
+            )
         elif depth == "deep":
-            depth_instruction = "Identify all key issues with clear explanations and actionable suggestions."
+            depth_instruction = (
+                "Deep Feedback: identify 6-8 meaningful issues when the essay is long enough. "
+                "For each issue, explain the cause, why it matters for the assignment, and a specific revision direction. "
+                "Include paragraph-level issues, voice issues, clarity issues, and sentence-level patterns."
+            )
         else:
             depth_instruction = (
-                "Do a comprehensive review: identify all issues with detailed explanations "
-                "and a concrete example rewrite for each suggestion."
+                "Full Review: do a comprehensive review with 9-12 issues when the essay is long enough. "
+                "Cover sentence-level problems, paragraph flow, evidence/examples, assignment fit, tone, and reader impact. "
+                "For every issue include a concrete suggested_revision sentence or phrase the student can compare against the original."
             )
 
         prompt = (
@@ -78,6 +88,9 @@ class CoachingService:
             f"Assignment type: {assignment_label}\n"
             f"Student writing level: {level_label}\n"
             f"Review depth: {depth_instruction}\n\n"
+            f"Output language: {output_language}. "
+            "All user-facing JSON string values must be in the same language as the student's essay. "
+            "Keep quoted original sentences exactly as written in the essay.\n\n"
             "Analyze the student's text and return:\n\n"
             "1. FOUR WRITING SCORES (0-100):\n"
             "   - ai_like_score: How much the writing resembles AI-generated text (higher = more AI-like)\n"
@@ -90,7 +103,8 @@ class CoachingService:
             "   Issue types: ai_pattern | unnatural_english | robotic_tone | missing_example | clarity_issue\n"
             "   Severity: 'high' (very obvious issue), 'medium' (moderate), 'low' (minor)\n"
             "   For each item: quote the sentence, explain WHY it sounds generic/unnatural (simple encouraging language), "
-            "give a directional suggestion — NOT a full rewrite.\n\n"
+            "give a directional suggestion, explain why_it_matters, and for Full Review include suggested_revision. "
+            "Deep Feedback may include suggested_revision for the most important issues. Quick Check should leave suggested_revision null.\n\n"
             "4. STRENGTHS: 2-3 genuine positive aspects\n\n"
             "5. OVERALL SUMMARY: 1-2 sentences\n\n"
             "Tone: Encouraging, educational, supportive coach — not a detector.\n\n"
@@ -103,7 +117,8 @@ class CoachingService:
             '  "signals": ["..."],\n'
             '  "feedback_items": [\n'
             '    {"sentence": "...", "issue_type": "...", "severity": "high|medium|low",\n'
-            '     "explanation": "...", "suggestion": "..."}\n'
+            '     "explanation": "...", "suggestion": "...",\n'
+            '     "suggested_revision": "..." or null, "why_it_matters": "..."}\n'
             "  ],\n"
             '  "strengths": ["..."],\n'
             '  "overall_summary": "..."\n'
@@ -123,7 +138,7 @@ class CoachingService:
             content = response.choices[0].message.content or ""
             return json.loads(content)
         except Exception:
-            return self._fallback_coaching(text)
+            return self._fallback_coaching(text, depth)
 
     def generate_integrity_content(self) -> dict[str, Any]:
         return {
@@ -138,9 +153,12 @@ class CoachingService:
             ),
         }
 
-    def _fallback_coaching(self, text: str) -> dict[str, Any]:
-        sentences = [s.strip() for s in text.split(".") if s.strip()]
+    def _fallback_coaching(self, text: str, depth: str = "deep") -> dict[str, Any]:
+        sentences = split_sentences(text)
         feedback_items = []
+        target_count = 3 if depth == "basic" else 7 if depth == "deep" else 10
+        output_language = detect_output_language(text)
+        is_korean = output_language == "Korean"
         ai_markers = [
             "furthermore", "moreover", "in conclusion", "it is essential",
             "plays a crucial role", "delve into", "shed light on", "it is worth noting",
@@ -154,40 +172,99 @@ class CoachingService:
                         "issue_type": "ai_pattern",
                         "severity": "medium",
                         "explanation": (
+                            f"'{marker}' 근처 표현은 AI가 자주 쓰는 공식적인 전환어처럼 보여 글이 덜 자연스럽게 느껴질 수 있습니다."
+                            if is_korean else
                             f"The phrase near '{marker}' is commonly used in AI-generated text "
                             "and can sound formulaic."
                         ),
                         "suggestion": (
+                            "전환어를 더 일상적인 표현으로 바꾸거나, 두 문장의 관계를 직접적으로 연결해 보세요."
+                            if is_korean else
                             "Try replacing this transition with something more conversational, "
                             "or connect your ideas more directly."
+                        ),
+                        "suggested_revision": (
+                            sentence.replace("Furthermore", "Also")
+                            .replace("Moreover", "Another point is")
+                            .replace("In conclusion", "To wrap up")
+                        ) if depth == "full_review" else None,
+                        "why_it_matters": (
+                            "공식적인 전환어가 많으면 실제 초안도 개인적인 글보다 틀에 맞춘 글처럼 보일 수 있습니다."
+                            if is_korean else
+                            "Formulaic transitions can make a real draft feel less personal and less specific."
                         ),
                     })
                     break
 
-        if not feedback_items and sentences:
+        if sentences and len(feedback_items) < target_count:
             feedback_items.append({
                 "sentence": sentences[0].strip(),
                 "issue_type": "missing_example",
                 "severity": "low",
-                "explanation": "This opening could be stronger with a specific personal example or opinion.",
-                "suggestion": "Think of a real experience you could add here to make the point more vivid.",
+                "explanation": (
+                    "도입부에 구체적인 개인 경험이나 의견이 들어가면 더 설득력 있게 시작할 수 있습니다."
+                    if is_korean else
+                    "This opening could be stronger with a specific personal example or opinion."
+                ),
+                "suggestion": (
+                    "이 주장과 연결되는 실제 경험이나 구체적인 상황을 한 가지 추가해 보세요."
+                    if is_korean else
+                    "Think of a real experience you could add here to make the point more vivid."
+                ),
+                "suggested_revision": None,
+                "why_it_matters": (
+                    "구체적인 예시는 일반적인 에세이 문체보다 작성자의 목소리를 더 잘 보여 줍니다."
+                    if is_korean else
+                    "Specific examples help the reader hear your own voice instead of a general essay voice."
+                ),
             })
+        if depth in ("deep", "full_review") and len(sentences) > 1 and len(feedback_items) < target_count:
+            feedback_items.append({
+                "sentence": sentences[-1].strip(),
+                "issue_type": "clarity_issue",
+                "severity": "medium",
+                "explanation": (
+                    "마무리는 핵심 내용을 반복하는 것보다 독자가 무엇을 이해해야 하는지 더 분명히 보여줄 수 있습니다."
+                    if is_korean else
+                    "The ending can do more than repeat the main idea."
+                ),
+                "suggestion": (
+                    "주장을 읽고 난 뒤 독자가 가져가야 할 의미를 한 문장으로 덧붙여 보세요."
+                    if is_korean else
+                    "Add one sentence that explains what the reader should understand after your argument."
+                ),
+                "suggested_revision": None,
+                "why_it_matters": (
+                    "좋은 마무리는 단순 문법 수정이 아니라 글 전체의 흐름과 메시지를 강화합니다."
+                    if is_korean else
+                    "A stronger closing makes the feedback feel connected to the whole essay, not just grammar."
+                ),
+            })
+
+        if is_korean:
+            signals = ["일부 문장이 일반적이거나 공식적인 문체로 느껴질 수 있습니다."]
+            strengths = ["핵심 주제가 비교적 분명합니다.", "글의 기본 흐름은 따라가기 쉽습니다."]
+            summary = "글의 기본 토대는 좋습니다. 개인적인 목소리와 구체적인 예시를 더하면 더 자연스럽고 설득력 있게 느껴질 수 있습니다."
+        else:
+            signals = ["Some AI-like transition phrases detected."]
+            strengths = [
+                "You have a clear main point.",
+                "The structure is easy to follow.",
+            ]
+            summary = (
+                "Your essay has a solid foundation. Focus on adding more of your personal voice "
+                "and specific examples to make it feel more authentically yours."
+            )
 
         return {
             "ai_like_score": 55,
             "naturalness_score": 45,
             "personal_voice_score": 35,
             "clarity_score": 60,
-            "signals": ["Some AI-like transition phrases detected."],
-            "feedback_items": feedback_items[:5],
-            "strengths": [
-                "You have a clear main point.",
-                "The structure is easy to follow.",
-            ],
-            "overall_summary": (
-                "Your essay has a solid foundation. Focus on adding more of your personal voice "
-                "and specific examples to make it feel more authentically yours."
-            ),
+            "signals": signals,
+            "feedback_items": feedback_items[:target_count],
+            "strengths": strengths,
+            "overall_summary": summary,
         }
 
 

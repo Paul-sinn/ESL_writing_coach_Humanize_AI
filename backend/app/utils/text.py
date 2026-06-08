@@ -4,6 +4,7 @@ import re
 
 
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+KOREAN_RE = re.compile(r"[\uac00-\ud7a3]")
 
 
 def count_words(text: str) -> int:
@@ -24,6 +25,15 @@ def split_sentences(text: str) -> list[str]:
 
 def normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def detect_output_language(text: str) -> str:
+    cleaned = text.strip()
+    if not cleaned:
+        return "English"
+    korean_chars = len(KOREAN_RE.findall(cleaned))
+    alpha_chars = len(re.findall(r"[A-Za-z]", cleaned))
+    return "Korean" if korean_chars >= 5 and korean_chars >= alpha_chars else "English"
 
 
 def extract_minimum_word_count(requirements: str) -> int | None:

@@ -43,6 +43,8 @@ class FeedbackItem(BaseModel):
     severity: Literal["low", "medium", "high"] = "medium"
     explanation: str
     suggestion: str
+    suggested_revision: str | None = None
+    why_it_matters: str | None = None
 
 
 class CheckoutOption(BaseModel):

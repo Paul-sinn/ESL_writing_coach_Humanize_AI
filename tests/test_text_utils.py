@@ -1,5 +1,6 @@
 from backend.app.utils.text import (
     count_words,
+    detect_output_language,
     extract_minimum_word_count,
     normalize_whitespace,
     split_sentences,
@@ -61,6 +62,16 @@ def test_normalize_whitespace_trims_edges():
 
 def test_normalize_whitespace_handles_newlines():
     assert normalize_whitespace("line one\nline two") == "line one line two"
+
+
+# --- detect_output_language ---
+
+def test_detect_output_language_korean():
+    assert detect_output_language("저는 학교에서 배운 내용을 바탕으로 이 글을 썼습니다.") == "Korean"
+
+
+def test_detect_output_language_english():
+    assert detect_output_language("I wrote this essay based on what I learned in class.") == "English"
 
 
 # --- extract_minimum_word_count ---
