@@ -18,12 +18,12 @@ TONE_INSTRUCTIONS = {
     "natural_student": (
         "Write like a real college student. Use contractions freely. Mix short punchy sentences with longer ones. "
         "Add a personal angle where it fits. Sound like someone who knows the topic but isn't trying to impress anyone. "
-        "Don't over-polish — real students sometimes repeat a point in a slightly different way."
+        "Don't over-polish. Real students sometimes repeat a point in a slightly different way."
     ),
     "academic": (
         "Keep a formal academic tone, but make it sound like a real person wrote it. "
         "Use precise vocabulary, but vary your sentence openings and lengths. "
-        "Avoid the mechanical precision of AI — a human academic writer occasionally hedges or qualifies."
+        "Avoid the mechanical precision of AI. A human academic writer occasionally hedges or qualifies."
     ),
     "simple_esl": (
         "Use clear, simple English. Short sentences. Common everyday vocabulary. "
@@ -33,8 +33,8 @@ TONE_INSTRUCTIONS = {
 }
 
 STRENGTH_INSTRUCTIONS = {
-    "light": "Make minimal changes — fix only the most obvious AI-like phrases and one or two robotic transitions. Leave most sentences intact.",
-    "balanced": "Make moderate changes throughout — improve naturalness and voice while keeping the student's original ideas and structure.",
+    "light": "Make minimal changes. Fix only the most obvious AI-like phrases and one or two robotic transitions. Leave most sentences intact.",
+    "balanced": "Make moderate changes throughout. Improve naturalness and voice while keeping the student's original ideas and structure.",
     "strong": "Substantially rewrite for maximum naturalness. Change sentence structure, word choice, and flow aggressively. Break up long uniform sentences. Keep all original arguments but make the writing feel genuinely human.",
 }
 
@@ -42,16 +42,16 @@ PERSONA_INSTRUCTIONS = {
     "esl_student": (
         "The writer is a non-native English speaker. Allow slightly imperfect but natural phrasing. "
         "Minor ESL patterns (slightly awkward word order, simpler connectors, occasional missing article) are fine and help authenticity. "
-        "Avoid overly polished native-sounding constructions — that's exactly what raises AI flags for ESL writers."
+        "Avoid overly polished native-sounding constructions because they raise AI flags for ESL writers."
     ),
     "freshman": (
         "The writer is a first-year college student still finding their academic voice. "
-        "Sound a bit tentative and earnest — not perfectly confident. "
+        "Sound a bit tentative and earnest, not perfectly confident. "
         "Light hedging ('I think', 'it seems like', 'maybe') is natural. Not every claim needs to sound authoritative."
     ),
     "upper_division": (
         "The writer is an upper-division college student with a confident, established academic voice. "
-        "Precise vocabulary and structured argumentation, but still a real person — not a machine. "
+        "Precise vocabulary and structured argumentation, but still a real person, not a machine. "
         "Occasional direct opinion or personal stance is expected at this level."
     ),
     "native_speaker": (
@@ -63,13 +63,14 @@ PERSONA_INSTRUCTIONS = {
 
 
 def _punctuation_rule(tone: str, persona: str) -> str:
-    if tone == "academic" and persona == "upper_division":
+    if persona in {"upper_division", "native_speaker"}:
         return (
-            "Em dashes (—) and semicolons (;) are acceptable but use sparingly — maximum 1-2 per essay total. "
+            "Em dashes and semicolons are allowed only when they sound natural for this persona, "
+            "with a hard maximum of 1-2 total per essay. Do not use them by default. "
             "Too many still reads as AI-generated."
         )
     return (
-        "Do NOT use em dashes (—) or semicolons (;). "
+        "Do NOT use em dashes or semicolons. "
         "These are strong AI detection signals outside of formal academic writing. "
         "Use periods, commas, or plain connectors ('and', 'but', 'so', 'because') instead."
     )
@@ -100,14 +101,17 @@ class HumanizeModelService:
         prompt = (
             "You are an expert writing analyst. Analyze the essay and identify:\n\n"
             "1. AI-LIKE PATTERNS: Specific phrases or sentences that sound AI-generated\n"
-            "2. REWRITE TARGETS: The 3-5 most important sentences to improve naturalness\n"
-            "3. TONE ISSUES: Overall tone problems (e.g. 'too formal', 'uniform sentence length')\n\n"
+            "2. REWRITE TARGETS: The important sentences, paragraphs, or recurring habits that should be rewritten. "
+            "Do not limit this to 3-5 sentences if the essay needs broader paraphrasing.\n"
+            "3. TONE ISSUES: Overall tone problems (e.g. 'too formal', 'uniform sentence length')\n"
+            "4. VOICE OPPORTUNITIES: Places where the writer's own stance, context, or simpler wording would sound more human\n\n"
             f"Target tone: {tone}, Rewrite strength: {strength}\n\n"
             f"{language_instruction}\n\n"
             "Return ONLY valid JSON:\n"
             '{"patterns_found": ["phrase1", ...], '
             '"rewrite_targets": ["sentence1", ...], '
-            '"tone_issues": ["issue1", ...]}'
+            '"tone_issues": ["issue1", ...], '
+            '"voice_opportunities": ["opportunity1", ...]}'
         )
         try:
             response = self._client.chat.completions.create(
@@ -161,11 +165,12 @@ class HumanizeModelService:
                 "ANALYSIS FINDINGS - use these to guide your rewrite:\n"
                 f"- AI patterns found: {analysis.get('patterns_found', [])}\n"
                 f"- Priority sentences to rewrite: {analysis.get('rewrite_targets', [])}\n"
-                f"- Tone issues: {analysis.get('tone_issues', [])}\n\n"
+                f"- Tone issues: {analysis.get('tone_issues', [])}\n"
+                f"- Voice opportunities: {analysis.get('voice_opportunities', [])}\n\n"
             )
 
         prompt = (
-            "You are rewriting a student essay to sound more natural and less AI-generated.\n\n"
+            "You are an expert at rewriting essays to sound more natural, clear, and authentically human.\n\n"
             f"{language_instruction}\n\n"
             f"WRITER PERSONA: {persona_instr}\n\n"
             f"{analysis_block}"
@@ -176,6 +181,13 @@ class HumanizeModelService:
             f"LENGTH: The original is {original_word_count} words. "
             f"Stay between {original_word_count} and {target_max_words} words. "
             "Do not shorten significantly -- assignments have word count requirements.\n\n"
+            "REWRITE APPROACH:\n"
+            "- Rewrite the essay as a complete draft, not just a cleanup of 3-5 sentences.\n"
+            "- Paraphrase broadly when the original sounds generic, but keep the same claims, examples, and assignment purpose.\n"
+            "- Make each paragraph sound like it was revised by the same student, with consistent vocabulary and confidence level.\n"
+            "- Prefer concrete, direct sentences over abstract filler. If a sentence sounds impressive but vague, make it plainer.\n"
+            "- Keep natural imperfection where it helps authenticity: small rhythm shifts, simple connectors, and a few less-polished turns are acceptable.\n"
+            "- Do not invent personal experiences, facts, citations, or examples that are not already implied by the essay.\n\n"
             "AVOID (these are strong AI detection signals):\n"
             "- Buzzwords: 'delve into', 'it is worth noting', 'plays a crucial role', "
             "'in today\\'s world', 'it is essential to', 'shed light on', 'navigate', 'foster', "
@@ -197,7 +209,9 @@ class HumanizeModelService:
             "- Light hedging where appropriate: 'I think', 'it seems like', 'probably'\n"
             "- Informal connectors: 'That said,', 'Still,', 'Even so,', 'But', 'So'\n"
             "- Slight rewording of a point instead of one-shot precision\n"
-            "- First-person opinion where context allows\n\n"
+            "- First-person opinion where context allows\n"
+            "- Topic-specific words from the original essay instead of generic academic language\n"
+            "- Paragraph endings that sound like a student's real conclusion, not a polished template\n\n"
             "Return JSON with keys:\n"
             "- rewritten_text: the full rewritten essay\n"
             "- summary_of_changes: 1-2 English sentences describing what changed\n"

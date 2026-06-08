@@ -174,10 +174,21 @@ function buildHumanizeChanges(originalText, rewrittenText, improvements = []) {
   return Array.from({ length: count }, (_, index) => {
     const original = originalBlocks[index] ?? "";
     const rewritten = rewrittenBlocks[index] ?? "";
+    const originalNormalized = normalizeForCompare(original);
+    const rewrittenNormalized = normalizeForCompare(rewritten);
+    const changed = originalNormalized !== rewrittenNormalized;
+    const changeType = !original
+      ? "added"
+      : !rewritten
+        ? "removed"
+        : changed
+          ? "edited"
+          : "unchanged";
     return {
       original,
       rewritten,
-      changed: normalizeForCompare(original) !== normalizeForCompare(rewritten),
+      changed,
+      changeType,
       reason: improvements[index] ?? "Wording, rhythm, or sentence flow changed here.",
     };
   }).filter((change) => change.original || change.rewritten);
@@ -209,6 +220,7 @@ export default function App() {
   const [coachFeedback, setCoachFeedback] = useState(null);
   const [selectedFeedbackIndex, setSelectedFeedbackIndex] = useState(0);
   const [selectedHumanizeChangeIndex, setSelectedHumanizeChangeIndex] = useState(0);
+  const [humanizedCopied, setHumanizedCopied] = useState(false);
   const [preserveMeaning, setPreserveMeaning] = useState(true);
   const [preserveCitations, setPreserveCitations] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(false);
@@ -253,6 +265,10 @@ export default function App() {
 
   const resultRef = useRef(null);
   const humanizeResultRef = useRef(null);
+  const feedbackHighlightRefs = useRef([]);
+  const feedbackIndexRefs = useRef([]);
+  const humanizeOriginalRefs = useRef([]);
+  const humanizeRewrittenRefs = useRef([]);
   const profileMenuRef = useRef(null);
 
   useEffect(() => {
@@ -297,6 +313,8 @@ export default function App() {
     : 0;
   const usageWarning = !isFreePlan && usageLimit > 0 && usagePercent >= 80 && usagePercent < 100;
   const usageExhausted = !isFreePlan && usageLimit > 0 && usagePercent >= 100;
+  const authModalLocked = onboardingRequired;
+  const canShowWorkspace = showEditor && !authStateLoading && !onboardingRequired;
 
   const selectedDepth = DEPTH_OPTIONS.find((d) => d.value === depth);
   const feedbackCost = isFreePlan ? 0 : Math.max(
@@ -312,6 +330,51 @@ export default function App() {
     ? buildHumanizeChanges(text, humanizeResult.rewritten_text, humanizeResult.key_improvements)
     : [];
   const selectedHumanizeChange = humanizeChanges[selectedHumanizeChangeIndex] ?? humanizeChanges.find((change) => change.changed);
+
+  function scrollToRef(ref) {
+    ref?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  }
+
+  function selectFeedback(index, shouldScrollToEssay = false) {
+    setSelectedFeedbackIndex(index);
+    if (shouldScrollToEssay) {
+      window.requestAnimationFrame(() => scrollToRef(feedbackHighlightRefs.current[index]));
+    } else {
+      window.requestAnimationFrame(() => scrollToRef(feedbackIndexRefs.current[index]));
+    }
+  }
+
+  function selectHumanizeChange(index, target = "pair") {
+    setSelectedHumanizeChangeIndex(index);
+    window.requestAnimationFrame(() => {
+      scrollToRef(humanizeOriginalRefs.current[index]);
+      if (target === "pair") scrollToRef(humanizeRewrittenRefs.current[index]);
+    });
+  }
+
+  async function copyHumanizedText() {
+    const value = humanizeResult?.rewritten_text ?? "";
+    if (!value.trim()) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setHumanizedCopied(true);
+      window.setTimeout(() => setHumanizedCopied(false), 1600);
+    } catch {
+      setError("Could not copy the humanized essay. Please select the text manually.");
+    }
+  }
 
   useEffect(() => {
     if (!user) {
@@ -821,9 +884,13 @@ export default function App() {
 
       {/* ── Auth modal ── */}
       {showAuthModal && (
-        <div className="auth-modal-overlay" onClick={() => setShowAuthModal(false)}>
+        <div className="auth-modal-overlay" onClick={() => {
+          if (!authModalLocked) setShowAuthModal(false);
+        }}>
           <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="auth-modal-close" onClick={() => setShowAuthModal(false)}>✕</button>
+            {!authModalLocked && (
+              <button className="auth-modal-close" onClick={() => setShowAuthModal(false)}>✕</button>
+            )}
 
             {authMode === "verify" && (
               <div className="auth-modal-header">
@@ -1024,8 +1091,18 @@ export default function App() {
         />
       )}
 
+      {showEditor && (authStateLoading || onboardingRequired) && (
+        <main className="workspace">
+          <section className="editor-card">
+            <div className="empty-state">
+              {onboardingRequired ? "Finish account setup to continue." : "Checking your account..."}
+            </div>
+          </section>
+        </main>
+      )}
+
       {/* ── Editor page ── */}
-      {showEditor && (
+      {canShowWorkspace && (
         <main className="workspace">
 
           <section className="editor-card">
@@ -1132,8 +1209,15 @@ export default function App() {
                     </span>
                   </button>
                   <button className="btn-humanize-action" disabled={!canSubmit} onClick={() => setShowHumanizeModal(true)}>
-                    <span className="btn-action-title">
-                      {humanizeLoading ? "Humanizing..." : "Humanize Essay"}
+                    <span className={`btn-action-title${humanizeLoading ? "" : " stacked"}`}>
+                      {humanizeLoading ? (
+                        "Humanizing..."
+                      ) : (
+                        <>
+                          <span>Humanize Essay</span>
+                          <span>Rewrite</span>
+                        </>
+                      )}
                     </span>
                     <span className="btn-action-cost">
                       {isFreePlan ? "Upgrade required" : `~${humanizeCost.toLocaleString()} cr`}
@@ -1205,10 +1289,17 @@ export default function App() {
                               return isIssue ? (
                                 <button
                                   key={`${part.text}-${i}`}
+                                  id={`feedback-source-${part.feedbackIndex}`}
+                                  ref={(node) => {
+                                    feedbackHighlightRefs.current[part.feedbackIndex] = node;
+                                  }}
                                   type="button"
                                   className={`essay-highlight${isActive ? " active" : ""}`}
-                                  onClick={() => setSelectedFeedbackIndex(part.feedbackIndex)}
+                                  aria-label={`Go to feedback ${part.feedbackIndex + 1}`}
+                                  aria-controls={`feedback-index-${part.feedbackIndex}`}
+                                  onClick={() => selectFeedback(part.feedbackIndex)}
                                 >
+                                  <span className="highlight-marker">{part.feedbackIndex + 1}</span>
                                   {part.text}
                                 </button>
                               ) : (
@@ -1226,7 +1317,7 @@ export default function App() {
                                   {selectedFeedback.severity?.toUpperCase()}
                                 </span>
                               </div>
-                              <blockquote className="feedback-quote">"{selectedFeedback.sentence}"</blockquote>
+                              <blockquote className="feedback-quote linked-highlight">"{selectedFeedback.sentence}"</blockquote>
                               <p className="feedback-explanation">{selectedFeedback.explanation}</p>
                               {selectedFeedback.why_it_matters && (
                                 <p className="feedback-why">{selectedFeedback.why_it_matters}</p>
@@ -1245,9 +1336,14 @@ export default function App() {
                             {result.feedback_items.map((item, i) => (
                               <button
                                 key={`${item.sentence}-${i}`}
+                                id={`feedback-index-${i}`}
+                                ref={(node) => {
+                                  feedbackIndexRefs.current[i] = node;
+                                }}
                                 type="button"
                                 className={`feedback-index-btn${i === selectedFeedbackIndex ? " active" : ""}`}
-                                onClick={() => setSelectedFeedbackIndex(i)}
+                                aria-controls={`feedback-source-${i}`}
+                                onClick={() => selectFeedback(i, true)}
                               >
                                 <span>{i + 1}</span>
                                 <strong>{ISSUE_LABELS[item.issue_type] ?? item.issue_type}</strong>
@@ -1298,25 +1394,50 @@ export default function App() {
                         {humanizeChanges.map((change, i) => (
                           <button
                             key={`original-${i}`}
+                            ref={(node) => {
+                              humanizeOriginalRefs.current[i] = node;
+                            }}
                             type="button"
-                            className={`change-block${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
-                            onClick={() => setSelectedHumanizeChangeIndex(i)}
+                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
+                            onClick={() => selectHumanizeChange(i)}
                           >
+                            {change.changeType !== "unchanged" && (
+                              <span className="change-chip">
+                                {change.changeType === "removed" ? "Deleted" : change.changeType === "added" ? "Added" : "Changed"}
+                              </span>
+                            )}
                             {change.original || "No matching original block."}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="essay-evidence-panel">
-                      <div className="compare-label">Humanized</div>
+                      <div className="compare-panel-header">
+                        <div className="compare-label">Humanized</div>
+                        <button
+                          type="button"
+                          className="copy-humanized-btn"
+                          onClick={copyHumanizedText}
+                        >
+                          {humanizedCopied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
                       <div className="compare-text">
                         {humanizeChanges.map((change, i) => (
                           <button
                             key={`rewritten-${i}`}
+                            ref={(node) => {
+                              humanizeRewrittenRefs.current[i] = node;
+                            }}
                             type="button"
-                            className={`change-block${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
-                            onClick={() => setSelectedHumanizeChangeIndex(i)}
+                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
+                            onClick={() => selectHumanizeChange(i)}
                           >
+                            {change.changeType !== "unchanged" && (
+                              <span className="change-chip">
+                                {change.changeType === "removed" ? "Deleted" : change.changeType === "added" ? "Added" : "Changed"}
+                              </span>
+                            )}
                             {change.rewritten || "Removed in rewrite."}
                           </button>
                         ))}

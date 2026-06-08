@@ -11,6 +11,12 @@
   --accent-soft: #8bb4d9;
   --warm: #a67e6f;
   --gold: #f2d5ce;
+  --mark-bg: #fff1a6;
+  --mark-bg-active: #ffe082;
+  --mark-line: #9a6200;
+  --mark-ink: #4a3300;
+  --mark-strong: #243e73;
+  --mark-strong-ink: #ffffff;
   --shadow: 0 18px 40px rgba(30, 49, 89, 0.1);
   --font-sans: "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
   font-family: var(--font-sans);
@@ -29,6 +35,12 @@ html.dark {
   --accent-soft: #4a7ab5;
   --warm: #8a7a6a;
   --gold: #2a2438;
+  --mark-bg: rgba(242, 202, 76, 0.24);
+  --mark-bg-active: rgba(242, 202, 76, 0.38);
+  --mark-line: #f2ca4c;
+  --mark-ink: #2b2100;
+  --mark-strong: #f2ca4c;
+  --mark-strong-ink: #201700;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -956,6 +968,12 @@ html.dark .landing-stat-card {
   box-shadow: 0 18px 44px rgba(30, 49, 89, 0.1);
 }
 
+.empty-state {
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+}
+
 .balance-card {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1518,6 +1536,12 @@ html.dark .signal-list span {
   font-size: 0.9rem;
 }
 
+.btn-action-title.stacked {
+  display: grid;
+  gap: 2px;
+  line-height: 1.08;
+}
+
 .btn-action-cost {
   font-size: 0.74rem;
   opacity: 0.75;
@@ -2049,28 +2073,44 @@ html.dark .essay-highlight-text {
   padding: 0 2px 2px;
   border: 0;
   border-radius: 3px;
-  background: transparent;
   color: inherit;
   font: inherit;
   line-height: inherit;
   text-align: left;
   cursor: pointer;
   text-decoration-line: underline;
-  text-decoration-color: rgba(204, 158, 36, 0.85);
+  text-decoration-color: var(--mark-line);
   text-decoration-thickness: 3px;
   text-underline-offset: 3px;
 }
 
-.essay-highlight:hover,
-.essay-highlight.active,
-.change-block:hover,
-.change-block.active {
-  background: rgba(242, 202, 76, 0.24);
+.essay-highlight {
+  background: var(--mark-bg);
 }
 
-.essay-highlight.active,
-.change-block.active {
-  box-shadow: inset 0 -3px 0 rgba(204, 158, 36, 0.45);
+.essay-highlight:hover,
+.essay-highlight.active {
+  background: var(--mark-bg-active);
+}
+
+.essay-highlight.active {
+  box-shadow: inset 0 -3px 0 var(--mark-line);
+}
+
+.highlight-marker {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  border-radius: 999px;
+  background: var(--mark-strong);
+  color: var(--mark-strong-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: 1px;
 }
 
 .feedback-index-list {
@@ -2092,6 +2132,10 @@ html.dark .essay-highlight-text {
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--mark-line);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .feedback-index-btn span {
@@ -2100,10 +2144,10 @@ html.dark .essay-highlight-text {
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: rgba(242, 202, 76, 0.22);
-  color: #805b00;
+  background: var(--mark-bg);
+  color: var(--mark-ink);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .feedback-index-btn strong {
@@ -2113,8 +2157,26 @@ html.dark .essay-highlight-text {
 }
 
 .feedback-index-btn.active {
-  border-color: rgba(204, 158, 36, 0.7);
-  background: rgba(242, 202, 76, 0.14);
+  border-color: var(--mark-line);
+  background: var(--mark-bg-active);
+  box-shadow: inset 0 -3px 0 var(--mark-line);
+}
+
+.feedback-index-btn.active span {
+  background: var(--mark-strong);
+  color: var(--mark-strong-ink);
+}
+
+.feedback-index-btn:hover {
+  background: var(--mark-bg);
+}
+
+.linked-highlight {
+  background: var(--mark-bg);
+  text-decoration-line: underline;
+  text-decoration-color: var(--mark-line);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
 }
 
 /* ── Strengths ── */
@@ -2441,6 +2503,42 @@ html.dark .severity-low { background: rgba(139, 180, 217, 0.13); color: #b7c3d8;
   align-items: start;
 }
 
+.compare-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.copy-humanized-btn {
+  min-width: 76px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.copy-humanized-btn:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+html.dark .copy-humanized-btn {
+  border-color: #8bb4d9;
+  background: #8bb4d9;
+  color: #0f1728;
+}
+
+html.dark .copy-humanized-btn:hover {
+  border-color: #b7cdec;
+  background: #b7cdec;
+}
+
 .change-block {
   display: block;
   width: 100%;
@@ -2448,16 +2546,49 @@ html.dark .severity-low { background: rgba(139, 180, 217, 0.13); color: #b7c3d8;
   padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
+  background: transparent;
+  text-decoration-color: transparent;
   white-space: pre-wrap;
 }
 
 .change-block.changed {
-  border-color: rgba(204, 158, 36, 0.28);
-  background: rgba(242, 202, 76, 0.11);
+  border-color: transparent;
 }
 
 .change-block.active {
-  border-color: rgba(204, 158, 36, 0.75);
+  border-color: var(--mark-line);
+  background: var(--mark-bg-active);
+  text-decoration-color: var(--mark-line);
+  box-shadow: inset 0 -3px 0 var(--mark-line);
+}
+
+.change-block.change-removed {
+  text-decoration-color: transparent;
+}
+
+.change-block.change-added {
+  text-decoration-color: transparent;
+}
+
+.change-block.change-removed.active {
+  text-decoration-color: rgba(174, 87, 57, 0.85);
+}
+
+.change-block.change-added.active {
+  text-decoration-color: rgba(65, 133, 88, 0.85);
+}
+
+.change-chip {
+  display: inline-block;
+  margin: 0 6px 2px 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--mark-strong);
+  color: var(--mark-strong-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: none;
 }
 
 /* ── Improvements ── */
