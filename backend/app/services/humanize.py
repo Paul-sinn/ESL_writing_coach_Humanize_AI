@@ -79,12 +79,13 @@ def _language_instruction(text: str) -> str:
     output_language = detect_output_language(text)
     if output_language == "Korean":
         return (
-            "OUTPUT LANGUAGE: Korean. Rewrite Korean essays in natural Korean, not English. "
-            "All JSON string values, including summary_of_changes and key_improvements, must be in Korean. "
-            "Do not translate the essay into English."
+            "OUTPUT LANGUAGE RULES: The rewritten_text must stay in natural Korean because the essay is Korean. "
+            "Do not translate the essay into English. "
+            "All explanation metadata, including summary_of_changes, key_improvements, patterns_found, "
+            "rewrite_targets, and tone_issues, must be in English."
         )
     return (
-        "OUTPUT LANGUAGE: English. All JSON string values should be in English unless the original essay clearly uses another language."
+        "OUTPUT LANGUAGE RULES: rewritten_text, summary_of_changes, key_improvements, and all analysis metadata must be in English."
     )
 
 
@@ -199,8 +200,8 @@ class HumanizeModelService:
             "- First-person opinion where context allows\n\n"
             "Return JSON with keys:\n"
             "- rewritten_text: the full rewritten essay\n"
-            "- summary_of_changes: 1-2 sentences describing what changed\n"
-            "- key_improvements: list of 3-5 specific improvements made"
+            "- summary_of_changes: 1-2 English sentences describing what changed\n"
+            "- key_improvements: list of 3-5 specific improvements made, written in English"
         )
 
         try:
@@ -248,8 +249,8 @@ class HumanizeModelService:
             "Do not add fake facts or unsupported examples.\n\n"
             "Return JSON with keys:\n"
             "- rewritten_text: the expanded rewrite\n"
-            "- summary_of_changes: 1-2 sentences describing what changed\n"
-            "- key_improvements: list of 3-5 specific improvements made"
+            "- summary_of_changes: 1-2 English sentences describing what changed\n"
+            "- key_improvements: list of 3-5 specific improvements made, written in English"
         )
         try:
             response = self._client.chat.completions.create(
@@ -297,21 +298,14 @@ class HumanizeModelService:
         return {
             "rewritten_text": normalize_whitespace(rewritten or text),
             "summary_of_changes": (
-                "전환 표현과 문장 리듬을 더 자연스럽게 다듬었습니다."
+                "Kept the Korean essay in Korean while adjusting transitions and sentence rhythm."
                 if is_korean else
                 "Adjusted transitions and loosened sentence rhythm to sound less formulaic."
             ),
-            "key_improvements": (
-                [
-                    "딱딱한 전환 표현을 더 자연스러운 연결로 바꿨습니다.",
-                    "지나치게 공식적인 문체를 줄였습니다.",
-                ]
-                if is_korean else
-                [
-                    "Replaced AI transition phrases with natural connectors",
-                    "Reduced overly formal phrasing",
-                ]
-            ),
+            "key_improvements": [
+                "Preserved the original essay language" if is_korean else "Replaced AI transition phrases with natural connectors",
+                "Reduced overly formal phrasing",
+            ],
         }
 
 

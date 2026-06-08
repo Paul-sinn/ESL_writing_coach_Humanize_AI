@@ -40,6 +40,25 @@ def test_coach_graph_returns_scores():
     assert response.verdict_label in ("low", "medium", "high")
 
 
+def test_coach_graph_korean_input_keeps_feedback_in_english():
+    result = coach_graph.invoke({
+        "user_id": "demo-plus",
+        "text": "저는 수업에서 배운 내용을 바탕으로 이 글을 썼습니다. 제 경험도 함께 설명하고 싶습니다.",
+        "depth": "deep",
+    })
+    response = result["response"]
+    assert response.feedback_items
+    assert "저는" in response.feedback_items[0].sentence
+    user_facing_feedback = " ".join([
+        response.overall_summary,
+        response.feedback_items[0].explanation,
+        response.feedback_items[0].suggestion,
+        response.feedback_items[0].why_it_matters or "",
+    ])
+    assert "구체적인" not in user_facing_feedback
+    assert "설명" not in user_facing_feedback
+
+
 def test_coach_graph_feedback_items_have_severity():
     result = coach_graph.invoke({
         "user_id": "demo-free",

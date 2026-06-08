@@ -74,6 +74,11 @@ def test_detect_output_language_english():
     assert detect_output_language("I wrote this essay based on what I learned in class.") == "English"
 
 
+def test_detect_output_language_english_with_small_korean_phrase():
+    text = "I wrote this essay about the Korean word 안녕하세요 and how language affects identity."
+    assert detect_output_language(text) == "English"
+
+
 # --- extract_minimum_word_count ---
 
 def test_extract_minimum_word_count_above_pattern():

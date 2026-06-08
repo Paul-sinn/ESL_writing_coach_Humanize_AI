@@ -33,7 +33,9 @@ def detect_output_language(text: str) -> str:
         return "English"
     korean_chars = len(KOREAN_RE.findall(cleaned))
     alpha_chars = len(re.findall(r"[A-Za-z]", cleaned))
-    return "Korean" if korean_chars >= 5 and korean_chars >= alpha_chars else "English"
+    language_chars = korean_chars + alpha_chars
+    korean_ratio = korean_chars / language_chars if language_chars else 0
+    return "Korean" if korean_chars >= 8 and korean_ratio >= 0.6 else "English"
 
 
 def extract_minimum_word_count(requirements: str) -> int | None:

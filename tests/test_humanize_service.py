@@ -152,11 +152,13 @@ def test_rewrite_korean_input_instructs_korean_output():
     )
 
     system_prompt = client.completions.kwargs[0]["messages"][0]["content"]
-    assert "OUTPUT LANGUAGE: Korean" in system_prompt
+    assert "rewritten_text must stay in natural Korean" in system_prompt
     assert "Do not translate the essay into English" in system_prompt
+    assert "summary_of_changes" in system_prompt
+    assert "must be in English" in system_prompt
 
 
-def test_fallback_rewrite_korean_input_returns_korean_metadata():
+def test_fallback_rewrite_korean_input_keeps_metadata_in_english():
     service = HumanizeModelService()
     service._client = None
 
@@ -170,5 +172,5 @@ def test_fallback_rewrite_korean_input_returns_korean_metadata():
         model="gpt-4o",
     )
 
-    assert "다듬었습니다" in result["summary_of_changes"]
-    assert result["key_improvements"][0].startswith("딱딱한")
+    assert "Korean" in result["summary_of_changes"]
+    assert result["key_improvements"][0] == "Preserved the original essay language"
