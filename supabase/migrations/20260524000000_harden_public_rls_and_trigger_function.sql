@@ -1,9 +1,5 @@
 -- Harden public schema RLS and trigger function exposure.
 --
--- Apply this against the Supabase project database with a write-capable
--- migration path. The connected MCP in this session is read-only, so it
--- cannot apply this file directly.
-
 -- 1) Enable RLS on public tables that were exposed without row policies.
 alter table public.profiles enable row level security;
 alter table public.user_accounts enable row level security;

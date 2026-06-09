@@ -234,9 +234,7 @@ export default function App() {
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
-  const [emailAvail, setEmailAvail] = useState(null);
   const [usernameAvail, setUsernameAvail] = useState(null);
-  const [emailChecking, setEmailChecking] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [tosAgreed, setTosAgreed] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -555,8 +553,9 @@ export default function App() {
 
   function openAuth(mode = "login") {
     setAuthMode(mode);
-    setAuthEmail(""); setEmailAvail(null);
-    setAuthUsername(""); setUsernameAvail(null);
+    setAuthEmail("");
+    setAuthUsername("");
+    setUsernameAvail(null);
     setAuthPassword("");
     setAuthPasswordConfirm("");
     setTosAgreed(false);

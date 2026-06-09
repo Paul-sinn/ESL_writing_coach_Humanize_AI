@@ -16,12 +16,12 @@ Expected policy shape:
 
 ```sql
 -- profiles
-USING (id = auth.uid())
-WITH CHECK (id = auth.uid())
+USING (id = (select auth.uid()))
+WITH CHECK (id = (select auth.uid()))
 
 -- user_activity_logs
-USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid())
+USING (user_id = (select auth.uid()))
+WITH CHECK (user_id = (select auth.uid()))
 ```
 
 Do not decrypt in RLS. PostgreSQL never receives `ENCRYPTION_KEY` or `HASH_KEY`.

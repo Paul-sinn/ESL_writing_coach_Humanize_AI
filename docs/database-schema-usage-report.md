@@ -9,7 +9,7 @@ The current schema has two groups of tables:
 - Core app tables already used by the product flow: `profiles`, `user_accounts`, `credit_ledger`, `rate_limits`.
 - New support tables/columns added for encryption, subscription history, usage reporting, and future security logging: `subscriptions`, `usage`, `user_activity_logs`, plus encrypted PII columns on `profiles`.
 
-The schema is structurally close to complete, but the latest Supabase MCP audit found missing RLS hardening on several public tables. Some newly added pieces are not yet heavily used by the UI and should be treated as support/future-proofing unless we decide to make them the source of truth.
+The schema is structurally close to complete. A pre-hardening Supabase audit found missing RLS hardening on several public tables; the hardening migration documents that remediation. Some newly added pieces are not yet heavily used by the UI and should be treated as support/future-proofing unless we decide to make them the source of truth.
 
 ## Current Tables
 
@@ -133,7 +133,7 @@ Where used:
 RLS:
 
 - Enabled.
-- Select policy: user can read rows where `user_id = auth.uid()`.
+- Select policy: user can read rows where `user_id = (select auth.uid())`.
 
 Important note:
 
@@ -171,7 +171,7 @@ Where used:
 RLS:
 
 - Enabled.
-- Select policy: user can read rows where `user_id = auth.uid()`.
+- Select policy: user can read rows where `user_id = (select auth.uid())`.
 
 Important note:
 
@@ -200,7 +200,7 @@ Where used:
 RLS:
 
 - Enabled.
-- Select policy: user can read rows where `user_id = auth.uid()`.
+- Select policy: user can read rows where `user_id = (select auth.uid())`.
 
 Important note:
 
@@ -243,14 +243,14 @@ There is currently no existing data in the new encrypted columns to migrate. `sc
 
 ## RLS Status
 
-Verified RLS-enabled tables:
+Pre-hardening audit showed these RLS-enabled tables:
 
 - `subscriptions`: RLS enabled.
 - `usage`: RLS enabled.
 - `user_activity_logs`: RLS enabled.
-- `credit_ledger`: RLS enabled, but the latest audit found no policy before the hardening migration.
+- `credit_ledger`: RLS enabled, but no policy before the hardening migration.
 
-Latest audit findings:
+Pre-hardening audit findings:
 
 - `profiles`: RLS disabled.
 - `user_accounts`: RLS disabled.
@@ -260,13 +260,13 @@ Latest audit findings:
 
 Policies:
 
-- `Users can read own subscription`: `user_id = auth.uid()`.
-- `Users can read own usage`: `user_id = auth.uid()`.
-- `Users can read own activity logs`: `user_id = auth.uid()`.
+- `Users can read own subscription`: `user_id = (select auth.uid())`.
+- `Users can read own usage`: `user_id = (select auth.uid())`.
+- `Users can read own activity logs`: `user_id = (select auth.uid())`.
 
 These policy names are internal DB labels. They are not shown to end users.
 
-The remediation SQL is stored in `supabase/migrations/20260524000000_harden_public_rls_and_trigger_function.sql`. The MCP connection used for the latest audit was read-only, so it could not apply the migration directly.
+The remediation SQL is stored in `supabase/migrations/20260524000000_harden_public_rls_and_trigger_function.sql`. It enables RLS for `profiles`, `user_accounts`, and `rate_limits`; adds owner-scoped read policies for exposed user-owned tables; recreates existing read policies with initplan-friendly `(select auth.uid())`; pins the trigger function search path; and revokes direct RPC execution of `handle_new_user()`.
 
 ## Current Risks / Cleanup Questions
 

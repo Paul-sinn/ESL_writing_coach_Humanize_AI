@@ -1,6 +1,7 @@
 import pytest
 from backend.app.graphs import billing_graph, coach_graph, humanize_graph
 from backend.app.services.billing import billing_service
+from backend.app.services.coaching import coaching_service
 from backend.app.services.humanize import humanize_service
 
 _TEXT = "This is a short essay. It sounds polished. Furthermore, it repeats transitions."
@@ -40,7 +41,9 @@ def test_coach_graph_returns_scores():
     assert response.verdict_label in ("low", "medium", "high")
 
 
-def test_coach_graph_korean_input_keeps_feedback_in_english():
+def test_coach_graph_korean_input_keeps_feedback_in_english(monkeypatch):
+    monkeypatch.setattr(coaching_service, "_client", None)
+
     result = coach_graph.invoke({
         "user_id": "demo-plus",
         "text": "저는 수업에서 배운 내용을 바탕으로 이 글을 썼습니다. 제 경험도 함께 설명하고 싶습니다.",
@@ -48,12 +51,12 @@ def test_coach_graph_korean_input_keeps_feedback_in_english():
     })
     response = result["response"]
     assert response.feedback_items
-    assert "저는" in response.feedback_items[0].sentence
+    assert any("저는" in item.sentence for item in response.feedback_items)
     user_facing_feedback = " ".join([
         response.overall_summary,
-        response.feedback_items[0].explanation,
-        response.feedback_items[0].suggestion,
-        response.feedback_items[0].why_it_matters or "",
+        " ".join(item.explanation for item in response.feedback_items),
+        " ".join(item.suggestion for item in response.feedback_items),
+        " ".join(item.why_it_matters or "" for item in response.feedback_items),
     ])
     assert "구체적인" not in user_facing_feedback
     assert "설명" not in user_facing_feedback

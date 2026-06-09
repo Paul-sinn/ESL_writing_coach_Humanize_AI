@@ -65,7 +65,6 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
             const isCurrent = plan.statusKey === (currentStatus ?? "free");
             const planIdx = PLAN_ORDER.indexOf(plan.statusKey);
             const isDowngrade = planIdx < currentIdx;
-            const isPlanChange = !isCurrent;
             const actionLabel = plan.statusKey === "free"
               ? "Manage subscription"
               : isDowngrade
@@ -90,7 +89,7 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
 
                 {isCurrent ? (
                   <div className="pricing-current-badge">Current plan</div>
-                ) : isPlanChange ? (
+                ) : (
                   <button
                     className={`pricing-upgrade-btn${plan.featured ? " pricing-upgrade-btn-primary" : ""}`}
                     onClick={() => onCheckout(plan.code)}
@@ -98,10 +97,6 @@ export default function PricingPage({ onClose, onCheckout, currentStatus, loadin
                   >
                     {loading === plan.code ? "Redirecting…" : actionLabel}
                   </button>
-                ) : currentStatus === "free" && plan.statusKey === "free" ? (
-                  <button className="pricing-upgrade-btn pricing-upgrade-btn-muted" onClick={onClose}>Start for free</button>
-                ) : (
-                  <div className="pricing-current-badge">Current plan</div>
                 )}
               </div>
             );

@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import {
   motion,
   useMotionValue,
@@ -32,8 +31,6 @@ function GridPattern({ patternId, offsetX, offsetY }) {
 }
 
 export default function LandingPage({ onStart, onUpgrade }) {
-  const containerRef = useRef(null);
-
   const mouseX = useMotionValue(-9999);
   const mouseY = useMotionValue(-9999);
 
@@ -60,7 +57,6 @@ export default function LandingPage({ onStart, onUpgrade }) {
 
   return (
     <div
-      ref={containerRef}
       className="landing-root"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}

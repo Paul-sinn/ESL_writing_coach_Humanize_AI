@@ -69,7 +69,7 @@ def test_checkout_upstream_error_returns_502(monkeypatch):
         app.dependency_overrides.clear()
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "Polar checkout 생성에 실패했습니다."
+    assert response.json()["detail"] == "Failed to create the Polar checkout."
 
 
 def test_checkout_success_returns_url(monkeypatch):

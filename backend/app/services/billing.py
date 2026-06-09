@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parseaddr
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -159,6 +160,50 @@ def _is_safe_customer_email(email: str | None) -> bool:
     return domain not in _RESERVED_EMAIL_DOMAINS and suffix not in _RESERVED_EMAIL_DOMAINS
 
 
+def _polar_headers(user_agent_suffix: str, *, json_body: bool = False) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {settings.polar_access_token}",
+        "Accept": "application/json",
+        "User-Agent": f"pj-1-humanize-app/0.1 {user_agent_suffix}",
+    }
+    if json_body:
+        headers["Content-Type"] = "application/json"
+    return headers
+
+
+async def _post_polar_json(
+    path: str,
+    *,
+    body: dict[str, object],
+    user_agent_suffix: str,
+    failure_label: str,
+    invalid_json_message: str,
+) -> dict[str, Any]:
+    endpoint = _polar_api_url(path)
+    headers = _polar_headers(user_agent_suffix, json_body=True)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(endpoint, json=body, headers=headers)
+    except httpx.RequestError as exc:
+        detail = str(exc)
+        print(f"Polar {failure_label} request failed: {detail}")
+        raise PolarCheckoutUpstreamError(detail) from exc
+
+    if response.status_code >= 400:
+        detail = response.text
+        print(f"Polar {failure_label} failed ({response.status_code}): {detail}")
+        raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        detail = response.text
+        print(f"Polar {failure_label} returned invalid JSON: {detail}")
+        raise PolarCheckoutUpstreamError(invalid_json_message) from exc
+
+    return cast(dict[str, Any], payload)
+
+
 class BillingService:
     def __init__(self) -> None:
         self._accounts: dict[str, UserAccount] = {
@@ -238,33 +283,13 @@ class BillingService:
             body["external_customer_id"] = user_id
             body["metadata"] = {"user_id": user_id}
 
-        endpoint = _polar_api_url("/checkouts/")
-        headers = {
-            "Authorization": f"Bearer {settings.polar_access_token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "pj-1-humanize-app/0.1 server-checkout",
-        }
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(endpoint, json=body, headers=headers)
-        except httpx.RequestError as exc:
-            detail = str(exc)
-            print(f"Polar checkout request failed: {detail}")
-            raise PolarCheckoutUpstreamError(detail) from exc
-
-        if response.status_code >= 400:
-            detail = response.text
-            print(f"Polar checkout failed ({response.status_code}): {detail}")
-            raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
-
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            detail = response.text
-            print(f"Polar checkout returned invalid JSON: {detail}")
-            raise PolarCheckoutUpstreamError("Polar checkout response was not valid JSON.") from exc
-
+        payload = await _post_polar_json(
+            "/checkouts/",
+            body=body,
+            user_agent_suffix="server-checkout",
+            failure_label="checkout",
+            invalid_json_message="Polar checkout response was not valid JSON.",
+        )
         checkout_url = payload.get("url") or payload.get("checkout_url")
         if not isinstance(checkout_url, str) or not checkout_url:
             raise PolarCheckoutUpstreamError("Polar checkout response did not include a checkout URL.")
@@ -283,32 +308,13 @@ class BillingService:
         if return_url:
             body["return_url"] = return_url
 
-        headers = {
-            "Authorization": f"Bearer {settings.polar_access_token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "pj-1-humanize-app/0.1 customer-portal",
-        }
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(_polar_api_url("/customer-sessions/"), json=body, headers=headers)
-        except httpx.RequestError as exc:
-            detail = str(exc)
-            print(f"Polar customer session request failed: {detail}")
-            raise PolarCheckoutUpstreamError(detail) from exc
-
-        if response.status_code >= 400:
-            detail = response.text
-            print(f"Polar customer session failed ({response.status_code}): {detail}")
-            raise PolarCheckoutUpstreamError(detail, status_code=response.status_code)
-
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            detail = response.text
-            print(f"Polar customer session returned invalid JSON: {detail}")
-            raise PolarCheckoutUpstreamError("Polar customer session response was not valid JSON.") from exc
-
+        payload = await _post_polar_json(
+            "/customer-sessions/",
+            body=body,
+            user_agent_suffix="customer-portal",
+            failure_label="customer session",
+            invalid_json_message="Polar customer session response was not valid JSON.",
+        )
         portal_url = payload.get("customer_portal_url")
         if not isinstance(portal_url, str) or not portal_url:
             raise PolarCheckoutUpstreamError("Polar customer session response did not include a portal URL.")
@@ -322,11 +328,7 @@ class BillingService:
             raise PolarCheckoutConfigError("Polar access token is not configured.")
 
         endpoint = _polar_api_url(f"/subscriptions/{quote(polar_subscription_id, safe='')}")
-        headers = {
-            "Authorization": f"Bearer {settings.polar_access_token}",
-            "Accept": "application/json",
-            "User-Agent": "pj-1-humanize-app/0.1 subscription-revoke",
-        }
+        headers = _polar_headers("subscription-revoke")
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.delete(endpoint, headers=headers)

@@ -14,10 +14,14 @@ function readDemoUser() {
   try {
     return JSON.parse(raw);
   } catch {
-    localStorage.removeItem(DEMO_USER_KEY);
-    localStorage.removeItem(DEMO_TOKEN_KEY);
+    clearDemoSession();
     return null;
   }
+}
+
+function clearDemoSession() {
+  localStorage.removeItem(DEMO_TOKEN_KEY);
+  localStorage.removeItem(DEMO_USER_KEY);
 }
 
 export function AuthProvider({ children }) {
@@ -97,7 +101,10 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    if (!supabase) { setLoading(false); return; }
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       applySupabaseSession(session);
@@ -112,8 +119,7 @@ export function AuthProvider({ children }) {
 
   async function signInWithGoogle() {
     if (!supabase) throw new Error("Supabase not configured — add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local");
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+    clearDemoSession();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -123,8 +129,7 @@ export function AuthProvider({ children }) {
 
   async function signInWithPassword(email, password) {
     if (!supabase) throw new Error("Supabase not configured");
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+    clearDemoSession();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
@@ -162,8 +167,7 @@ export function AuthProvider({ children }) {
 
   async function signUp(email, password, metadata = {}) {
     if (!supabase) throw new Error("Supabase not configured");
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+    clearDemoSession();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -174,8 +178,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    localStorage.removeItem(DEMO_TOKEN_KEY);
-    localStorage.removeItem(DEMO_USER_KEY);
+    clearDemoSession();
     if (supabase) {
       await supabase.auth.signOut();
     }
