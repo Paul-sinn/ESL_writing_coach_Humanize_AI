@@ -1,0 +1,21 @@
+{
+  "project": "ESL Academic Writing Coach",
+  "phase": "auth-billing-stability",
+  "steps": [
+    {
+      "step": 0,
+      "name": "auth-schema-contracts",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "billing-deletion-contracts",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "frontend-onboarding-errors",
+      "status": "pending"
+    }
+  ]
+}

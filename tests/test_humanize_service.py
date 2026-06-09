@@ -158,6 +158,85 @@ def test_rewrite_korean_input_instructs_korean_output():
     assert "must be in English" in system_prompt
 
 
+def test_analyze_for_rewrite_does_not_limit_targets_to_three_to_five_sentences():
+    service, client = _service_with_payloads([
+        {
+            "patterns_found": [],
+            "rewrite_targets": [],
+            "tone_issues": [],
+            "voice_opportunities": [],
+        }
+    ])
+
+    service.analyze_for_rewrite(
+        "This essay sounds generic. It needs more natural rhythm.",
+        tone="natural_student",
+        strength="balanced",
+        model="gpt-4o",
+    )
+
+    system_prompt = client.completions.kwargs[0]["messages"][0]["content"]
+    assert "Do not limit this to 3-5 sentences" in system_prompt
+    assert "VOICE OPPORTUNITIES" in system_prompt
+    assert '"voice_opportunities"' in system_prompt
+
+
+def test_rewrite_prompt_requires_full_draft_rewrite_and_blocks_em_dashes_by_default():
+    original = "This essay explains my experience in class and why it mattered to me."
+    service, client = _service_with_payloads([
+        {
+            "rewritten_text": original,
+            "summary_of_changes": "Kept the draft natural.",
+            "key_improvements": [],
+        }
+    ])
+
+    service.rewrite(
+        original,
+        tone="natural_student",
+        strength="balanced",
+        preserve_meaning=True,
+        preserve_citations=False,
+        preserve_structure=False,
+        model="gpt-4o",
+        persona="esl_student",
+        analysis={"voice_opportunities": ["Use a more direct student stance."]},
+    )
+
+    system_prompt = client.completions.kwargs[0]["messages"][0]["content"]
+    assert "Rewrite the essay as a complete draft" in system_prompt
+    assert "Paraphrase broadly" in system_prompt
+    assert "Do NOT use em dashes or semicolons" in system_prompt
+    assert "Voice opportunities" in system_prompt
+    assert "—" not in system_prompt
+
+
+def test_rewrite_prompt_allows_very_limited_em_dashes_for_native_persona():
+    original = "The class helped me understand the topic in a more practical way."
+    service, client = _service_with_payloads([
+        {
+            "rewritten_text": original,
+            "summary_of_changes": "Kept the draft natural.",
+            "key_improvements": [],
+        }
+    ])
+
+    service.rewrite(
+        original,
+        tone="natural_student",
+        strength="balanced",
+        preserve_meaning=True,
+        preserve_citations=False,
+        preserve_structure=False,
+        model="gpt-4o",
+        persona="native_speaker",
+    )
+
+    system_prompt = client.completions.kwargs[0]["messages"][0]["content"]
+    assert "hard maximum of 1-2 total per essay" in system_prompt
+    assert "Do not use them by default" in system_prompt
+
+
 def test_fallback_rewrite_korean_input_keeps_metadata_in_english():
     service = HumanizeModelService()
     service._client = None

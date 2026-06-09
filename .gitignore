@@ -16,3 +16,15 @@ frontend/dist/
 .uv.lock
 
 .ai_career_plan.md
+node_modules/
+.next/
+out/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# phase execution outputs
+phases/**/phase*-output.json
+phases/**/step*-output.json
+
+# local Supabase CLI state
+supabase/.temp/

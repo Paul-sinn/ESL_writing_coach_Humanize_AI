@@ -169,6 +169,33 @@ def test_deleted_account_is_blocked_from_protected_api():
     assert response.json()["detail"] == "This account has been deleted."
 
 
+def test_auth_me_keeps_existing_profile_when_billing_load_fails(monkeypatch):
+    profile = Profile(
+        id=UUID(USER_ID),
+        email="student@example.com",
+        username="existing_student",
+        nickname="Existing Student",
+        terms_accepted_at=datetime.now(timezone.utc),
+        privacy_accepted_at=datetime.now(timezone.utc),
+    )
+    fake_db = FakeDb(profile)
+
+    async def fail_load_to_memory(*args, **kwargs):
+        raise RuntimeError("transient billing sync failure")
+
+    monkeypatch.setattr("backend.app.main.billing_service.async_load_to_memory", fail_load_to_memory)
+    app.dependency_overrides[auth_service.get_current_user] = _auth_user
+    app.dependency_overrides[get_db] = _override_db(fake_db)
+    try:
+        response = TestClient(app).get("/api/auth/me")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "existing_student"
+    assert response.json()["needs_onboarding"] is False
+
+
 def test_complete_onboarding_sets_username_and_acceptance_times():
     profile = Profile(id=UUID(USER_ID), email="student@example.com")
     fake_db = FakeDb(profile, execute_values=[None, profile])

@@ -145,3 +145,51 @@ def test_free_plan_for_existing_subscriber_returns_customer_portal(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["checkout_url"] == "https://polar.sh/portal/cancel"
+
+
+def test_billing_status_syncs_polar_state_for_paid_accounts(monkeypatch):
+    calls = {"sync": 0, "load": 0, "commit": 0}
+
+    async def fake_get_or_create_account(*args, **kwargs):
+        return SimpleNamespace(subscription_status="student_plus")
+
+    async def fake_sync_from_polar_customer_state(*args, **kwargs):
+        calls["sync"] += 1
+        return True
+
+    async def fake_load_to_memory(*args, **kwargs):
+        calls["load"] += 1
+
+    def fake_get_status(*args, **kwargs):
+        return {
+            "subscription_status": "pro",
+            "credits_remaining": 150000,
+            "plan_name": "Pro",
+            "monthly_credit_limit": 150000,
+            "usage_used": 0,
+            "usage_limit": 150000,
+            "usage_percent": 0,
+            "available_credit_packs": [],
+        }
+
+    class FakeStatusDb(FakeDb):
+        async def commit(self):
+            calls["commit"] += 1
+
+    async def fake_db():
+        yield FakeStatusDb()
+
+    monkeypatch.setattr("backend.app.main.billing_service.async_get_or_create_db_account", fake_get_or_create_account)
+    monkeypatch.setattr("backend.app.main.billing_service.async_sync_from_polar_customer_state", fake_sync_from_polar_customer_state)
+    monkeypatch.setattr("backend.app.main.billing_service.async_load_to_memory", fake_load_to_memory)
+    monkeypatch.setattr("backend.app.main.billing_service.get_status", fake_get_status)
+    app.dependency_overrides[auth_service.get_current_user] = _auth_user
+    app.dependency_overrides[get_db] = fake_db
+    try:
+        response = TestClient(app).get("/api/billing/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["subscription_status"] == "pro"
+    assert calls == {"sync": 1, "load": 1, "commit": 1}
