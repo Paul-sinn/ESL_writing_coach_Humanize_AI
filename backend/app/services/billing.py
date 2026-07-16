@@ -164,7 +164,7 @@ def _polar_headers(user_agent_suffix: str, *, json_body: bool = False) -> dict[s
     headers = {
         "Authorization": f"Bearer {settings.polar_access_token}",
         "Accept": "application/json",
-        "User-Agent": f"pj-1-humanize-app/0.1 {user_agent_suffix}",
+        "User-Agent": f"pj-1-rewriter-app/0.1 {user_agent_suffix}",
     }
     if json_body:
         headers["Content-Type"] = "application/json"
@@ -455,7 +455,7 @@ class BillingService:
         headers = {
             "Authorization": f"Bearer {settings.polar_access_token}",
             "Accept": "application/json",
-            "User-Agent": "pj-1-humanize-app/0.1 customer-state-sync",
+            "User-Agent": "pj-1-rewriter-app/0.1 customer-state-sync",
         }
         endpoint = _polar_api_url(f"/customers/external/{quote(user_id, safe='')}/state")
         try:

@@ -15,7 +15,7 @@ const PLANS = [
     price: 7,
     unit: "/mo",
     credits: "20,000 cr/mo",
-    features: ["~10 deep analyses/mo", "1,200 word limit", "All feedback types", "Humanize tool"],
+    features: ["~10 deep analyses/mo", "1,200 word limit", "All feedback types", "Rewriter tool"],
   },
   {
     code: "student_plus_monthly",
@@ -24,7 +24,7 @@ const PLANS = [
     price: 12,
     unit: "/mo",
     credits: "60,000 cr/mo",
-    features: ["~30 deep analyses/mo", "1,200 word limit", "All feedback + Humanize", "Priority support"],
+    features: ["~30 deep analyses/mo", "1,200 word limit", "All feedback + Rewriter", "Priority support"],
     featured: true,
   },
   {
@@ -34,7 +34,7 @@ const PLANS = [
     price: 19,
     unit: "/mo",
     credits: "150,000 cr/mo",
-    features: ["~75 deep analyses/mo", "1,200 word limit", "All feedback + Humanize", "Priority support"],
+    features: ["~75 deep analyses/mo", "1,200 word limit", "All feedback + Rewriter", "Priority support"],
   },
 ];
 

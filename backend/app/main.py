@@ -16,7 +16,7 @@ from sqlalchemy import select
 from .config import get_settings
 from .db.database import DbSession
 from .db.models import Profile, UserActivityLogDB
-from .graphs import calculate_coach_credits, calculate_humanize_credits, coach_graph, humanize_graph
+from .graphs import calculate_coach_credits, calculate_rewriter_credits, coach_graph, rewriter_graph
 from .schemas import (
     BillingStatusResponse,
     CheckoutRequest,
@@ -28,8 +28,8 @@ from .schemas import (
     DeleteAccountResponse,
     DemoLoginRequest,
     DemoLoginResponse,
-    HumanizeRequest,
-    HumanizeResponse,
+    RewriterRequest,
+    RewriterResponse,
     UserResponse,
     USERNAME_PATTERN,
 )
@@ -60,7 +60,7 @@ def _uses_persistent_billing(user_id: str) -> bool:
     return True
 
 
-def _billing_limit_detail(response: CoachResponse | HumanizeResponse) -> dict | None:
+def _billing_limit_detail(response: CoachResponse | RewriterResponse) -> dict | None:
     redirect = response.billing_redirect
     if redirect is None:
         return None
@@ -194,12 +194,12 @@ async def coach(
     return response
 
 
-@app.post("/api/humanize", response_model=HumanizeResponse)
-async def humanize(
-    payload: HumanizeRequest,
+@app.post("/api/rewriter", response_model=RewriterResponse)
+async def rewriter(
+    payload: RewriterRequest,
     db: DbSession,
     current_user=Depends(auth_service.get_current_user),
-) -> HumanizeResponse:
+) -> RewriterResponse:
     await _require_active_user(current_user, db)
     user_id = current_user.user_id
     reserved_ledger_id: int | None = None
@@ -208,11 +208,11 @@ async def humanize(
         await billing_service.async_load_to_memory(user_id, db)
         status = billing_service.get_status(user_id)
         if status.subscription_status != "free":
-            credits_required = calculate_humanize_credits(count_words(payload.text))
-            reserved_ledger_id = await _reserve_credits(user_id, credits_required, "humanize", db)
+            credits_required = calculate_rewriter_credits(count_words(payload.text))
+            reserved_ledger_id = await _reserve_credits(user_id, credits_required, "rewriter", db)
 
     try:
-        result = humanize_graph.invoke({
+        result = rewriter_graph.invoke({
             "user_id": user_id,
             "text": payload.text,
             "tone": payload.tone,
@@ -232,7 +232,7 @@ async def humanize(
                 await billing_service.async_capture_reservation(reserved_ledger_id, db)
                 await billing_service.async_record_usage(
                     user_id,
-                    feature="humanize",
+                    feature="rewriter",
                     words=response.input_word_count,
                     credits_used=response.credits_charged,
                     db=db,
@@ -241,7 +241,7 @@ async def humanize(
         elif db is not None and _uses_persistent_billing(user_id) and not response.billing_redirect:
             await billing_service.async_record_usage(
                 user_id,
-                feature="humanize",
+                feature="rewriter",
                 words=response.input_word_count,
                 credits_used=response.credits_charged,
                 db=db,

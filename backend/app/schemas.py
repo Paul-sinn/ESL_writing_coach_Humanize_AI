@@ -81,7 +81,7 @@ class CoachResponse(BaseModel):
     billing_redirect: BillingRedirect | None = None
 
 
-class HumanizeRequest(BaseModel):
+class RewriterRequest(BaseModel):
     text: str = Field(min_length=1)
     tone: Literal["natural_student", "academic", "simple_esl"] = "natural_student"
     strength: Literal["light", "balanced", "strong"] = "balanced"
@@ -99,7 +99,7 @@ class HumanizeRequest(BaseModel):
         return value
 
 
-class HumanizeResponse(BaseModel):
+class RewriterResponse(BaseModel):
     rewritten_text: str
     summary_of_changes: str
     key_improvements: list[str] = Field(default_factory=list)

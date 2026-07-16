@@ -6,8 +6,8 @@ import PricingPage from "./components/PricingPage";
 
 const WORD_LIMIT = 1200;
 const FREE_WORD_LIMIT = 300;
-const HUMANIZE_COST_PER_WORD = 5;
-const HUMANIZE_MIN_CREDITS = 5000;
+const REWRITER_COST_PER_WORD = 5;
+const REWRITER_MIN_CREDITS = 5000;
 
 const ASSIGNMENT_TYPES = [
   { value: "general_academic", label: "Academic Paragraph" },
@@ -167,7 +167,7 @@ function buildFeedbackHighlights(sourceText, feedbackItems) {
   });
 }
 
-function buildHumanizeChanges(originalText, rewrittenText, improvements = []) {
+function buildRewriteChanges(originalText, rewrittenText, improvements = []) {
   const originalBlocks = splitReviewBlocks(originalText);
   const rewrittenBlocks = splitReviewBlocks(rewrittenText);
   const count = Math.max(originalBlocks.length, rewrittenBlocks.length);
@@ -206,23 +206,23 @@ export default function App() {
   const [depth, setDepth] = useState("deep");
   const [result, setResult] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(true);
-  const [humanizeOpen, setHumanizeOpen] = useState(true);
+  const [rewriteOpen, setRewriteOpen] = useState(true);
   const [billing, setBilling] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingLoadFailed, setBillingLoadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
-  const [humanizeResult, setHumanizeResult] = useState(null);
-  const [humanizeLoading, setHumanizeLoading] = useState(false);
-  const [showHumanizeModal, setShowHumanizeModal] = useState(false);
-  const [humanizeTone, setHumanizeTone] = useState("natural_student");
-  const [humanizeStrength, setHumanizeStrength] = useState("balanced");
-  const [humanizePersona, setHumanizePersona] = useState("esl_student");
+  const [rewriteResult, setRewriteResult] = useState(null);
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [showRewriteModal, setShowRewriteModal] = useState(false);
+  const [rewriteTone, setRewriteTone] = useState("natural_student");
+  const [rewriteStrength, setRewriteStrength] = useState("balanced");
+  const [rewritePersona, setRewritePersona] = useState("esl_student");
   const [coachFeedback, setCoachFeedback] = useState(null);
   const [selectedFeedbackIndex, setSelectedFeedbackIndex] = useState(0);
-  const [selectedHumanizeChangeIndex, setSelectedHumanizeChangeIndex] = useState(0);
-  const [humanizedCopied, setHumanizedCopied] = useState(false);
+  const [selectedRewriteChangeIndex, setSelectedRewriteChangeIndex] = useState(0);
+  const [rewrittenCopied, setRewrittenCopied] = useState(false);
   const [preserveMeaning, setPreserveMeaning] = useState(true);
   const [preserveCitations, setPreserveCitations] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(false);
@@ -253,11 +253,11 @@ export default function App() {
   }, [darkMode]);
 
   const resultRef = useRef(null);
-  const humanizeResultRef = useRef(null);
+  const rewriteResultRef = useRef(null);
   const feedbackHighlightRefs = useRef([]);
   const feedbackIndexRefs = useRef([]);
-  const humanizeOriginalRefs = useRef([]);
-  const humanizeRewrittenRefs = useRef([]);
+  const rewriteOriginalRefs = useRef([]);
+  const rewriteRewrittenRefs = useRef([]);
   const profileMenuRef = useRef(null);
 
   useEffect(() => {
@@ -282,14 +282,14 @@ export default function App() {
   }, [result]);
 
   useEffect(() => {
-    if (!humanizeResult || humanizeLoading) return;
+    if (!rewriteResult || rewriteLoading) return;
     const timer = setTimeout(() => {
-      if (!humanizeResultRef.current) return;
-      const y = humanizeResultRef.current.getBoundingClientRect().top + window.scrollY - 80;
+      if (!rewriteResultRef.current) return;
+      const y = rewriteResultRef.current.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top: y, behavior: "smooth" });
     }, 80);
     return () => clearTimeout(timer);
-  }, [humanizeResult, humanizeLoading]);
+  }, [rewriteResult, rewriteLoading]);
 
   const wordCount = countWords(text);
   const overLimit = wordCount > WORD_LIMIT;
@@ -312,15 +312,15 @@ export default function App() {
     wordCount * (selectedDepth?.costPerWord ?? 2),
     selectedDepth?.minCredits ?? 1200,
   );
-  const humanizeCost = isFreePlan ? 0 : Math.max(wordCount * HUMANIZE_COST_PER_WORD, HUMANIZE_MIN_CREDITS);
-  const canSubmit = text.trim() && !overLimit && !loading && !humanizeLoading && !billingStatusPending && !billingStatusUnavailable;
+  const rewriteCost = isFreePlan ? 0 : Math.max(wordCount * REWRITER_COST_PER_WORD, REWRITER_MIN_CREDITS);
+  const canSubmit = text.trim() && !overLimit && !loading && !rewriteLoading && !billingStatusPending && !billingStatusUnavailable;
   const feedbackItems = result?.feedback_items ?? [];
   const feedbackHighlights = buildFeedbackHighlights(text, feedbackItems);
   const selectedFeedback = feedbackItems[selectedFeedbackIndex] ?? feedbackItems[0];
-  const humanizeChanges = humanizeResult && !humanizeResult.billing_redirect
-    ? buildHumanizeChanges(text, humanizeResult.rewritten_text, humanizeResult.key_improvements)
+  const rewriteChanges = rewriteResult && !rewriteResult.billing_redirect
+    ? buildRewriteChanges(text, rewriteResult.rewritten_text, rewriteResult.key_improvements)
     : [];
-  const selectedHumanizeChange = humanizeChanges[selectedHumanizeChangeIndex] ?? humanizeChanges.find((change) => change.changed);
+  const selectedRewriteChange = rewriteChanges[selectedRewriteChangeIndex] ?? rewriteChanges.find((change) => change.changed);
 
   function scrollToRef(ref) {
     ref?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
@@ -335,16 +335,16 @@ export default function App() {
     }
   }
 
-  function selectHumanizeChange(index, target = "pair") {
-    setSelectedHumanizeChangeIndex(index);
+  function selectRewriteChange(index, target = "pair") {
+    setSelectedRewriteChangeIndex(index);
     window.requestAnimationFrame(() => {
-      scrollToRef(humanizeOriginalRefs.current[index]);
-      if (target === "pair") scrollToRef(humanizeRewrittenRefs.current[index]);
+      scrollToRef(rewriteOriginalRefs.current[index]);
+      if (target === "pair") scrollToRef(rewriteRewrittenRefs.current[index]);
     });
   }
 
-  async function copyHumanizedText() {
-    const value = humanizeResult?.rewritten_text ?? "";
+  async function copyRewrittenText() {
+    const value = rewriteResult?.rewritten_text ?? "";
     if (!value.trim()) return;
     try {
       if (navigator.clipboard?.writeText) {
@@ -360,10 +360,10 @@ export default function App() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      setHumanizedCopied(true);
-      window.setTimeout(() => setHumanizedCopied(false), 1600);
+      setRewrittenCopied(true);
+      window.setTimeout(() => setRewrittenCopied(false), 1600);
     } catch {
-      setError("Could not copy the humanized essay. Please select the text manually.");
+      setError("Could not copy the rewritten essay. Please select the text manually.");
     }
   }
 
@@ -459,28 +459,28 @@ export default function App() {
     }
   }
 
-  async function handleHumanize() {
-    setShowHumanizeModal(false);
-    setHumanizeLoading(true);
-    setHumanizeResult(null);
+  async function handleRewrite() {
+    setShowRewriteModal(false);
+    setRewriteLoading(true);
+    setRewriteResult(null);
     try {
-      const data = await fetchJson("/api/humanize", {
+      const data = await fetchJson("/api/rewriter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          tone: humanizeTone,
-          strength: humanizeStrength,
-          persona: humanizePersona,
+          tone: rewriteTone,
+          strength: rewriteStrength,
+          persona: rewritePersona,
           coach_feedback: coachFeedback,
           preserve_meaning: preserveMeaning,
           preserve_citations: preserveCitations,
           preserve_structure: preserveStructure,
         }),
       });
-      setHumanizeResult(data);
-      setHumanizeOpen(true);
-      setSelectedHumanizeChangeIndex(0);
+      setRewriteResult(data);
+      setRewriteOpen(true);
+      setSelectedRewriteChangeIndex(0);
       if (data.billing_redirect) setError(data.billing_redirect.message);
       await refreshBilling();
     } catch (err) {
@@ -490,7 +490,7 @@ export default function App() {
       }
       setError(err.message);
     } finally {
-      setHumanizeLoading(false);
+      setRewriteLoading(false);
     }
   }
 
@@ -543,7 +543,7 @@ export default function App() {
       setBilling(null);
       setShowEditor(false);
       setResult(null);
-      setHumanizeResult(null);
+      setRewriteResult(null);
     } catch (err) {
       setError(err.message ?? "Account deletion failed.");
     } finally {
@@ -860,18 +860,18 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Humanize modal ── */}
-      {showHumanizeModal && (
-        <div className="humanize-modal-overlay" onClick={() => setShowHumanizeModal(false)}>
-          <div className="humanize-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Humanize Options</h3>
+      {/* ── Rewrite modal ── */}
+      {showRewriteModal && (
+        <div className="rewrite-modal-overlay" onClick={() => setShowRewriteModal(false)}>
+          <div className="rewrite-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Rewrite Options</h3>
             <div className="option-group">
               <div className="option-label">Tone</div>
               <div className="toggle-row">
                 {TONE_OPTIONS.map((t) => (
                   <button key={t.value}
-                    className={`toggle-btn ${humanizeTone === t.value ? "active" : ""}`}
-                    onClick={() => setHumanizeTone(t.value)}>{t.label}</button>
+                    className={`toggle-btn ${rewriteTone === t.value ? "active" : ""}`}
+                    onClick={() => setRewriteTone(t.value)}>{t.label}</button>
                 ))}
               </div>
             </div>
@@ -880,8 +880,8 @@ export default function App() {
               <div className="toggle-row">
                 {STRENGTH_OPTIONS.map((s) => (
                   <button key={s.value}
-                    className={`toggle-btn ${humanizeStrength === s.value ? "active" : ""}`}
-                    onClick={() => setHumanizeStrength(s.value)}>{s.label}</button>
+                    className={`toggle-btn ${rewriteStrength === s.value ? "active" : ""}`}
+                    onClick={() => setRewriteStrength(s.value)}>{s.label}</button>
                 ))}
               </div>
             </div>
@@ -903,14 +903,14 @@ export default function App() {
               <div className="toggle-row">
                 {PERSONA_OPTIONS.map((p) => (
                   <button key={p.value}
-                    className={`toggle-btn ${humanizePersona === p.value ? "active" : ""}`}
-                    onClick={() => setHumanizePersona(p.value)}>{p.label}</button>
+                    className={`toggle-btn ${rewritePersona === p.value ? "active" : ""}`}
+                    onClick={() => setRewritePersona(p.value)}>{p.label}</button>
                 ))}
               </div>
             </div>
             <div className="modal-actions">
-              <button className="secondary" onClick={() => setShowHumanizeModal(false)}>Cancel</button>
-              <button onClick={handleHumanize}>Run Humanize →</button>
+              <button className="secondary" onClick={() => setShowRewriteModal(false)}>Cancel</button>
+              <button onClick={handleRewrite}>Run Rewrite →</button>
             </div>
           </div>
         </div>
@@ -1255,21 +1255,21 @@ export default function App() {
                       {isFreePlan ? "Free · 300 words" : `~${feedbackCost.toLocaleString()} cr`}
                     </span>
                   </button>
-                  <button className="btn-humanize-action" disabled={!canSubmit} onClick={() => setShowHumanizeModal(true)}>
-                    <span className={`btn-action-title${humanizeLoading ? "" : " stacked"}`}>
+                  <button className="btn-rewrite-action" disabled={!canSubmit} onClick={() => setShowRewriteModal(true)}>
+                    <span className={`btn-action-title${rewriteLoading ? "" : " stacked"}`}>
                       {billingStatusPending ? (
                         "Loading credits..."
-                      ) : humanizeLoading ? (
-                        "Humanizing..."
+                      ) : rewriteLoading ? (
+                        "Rewriting..."
                       ) : (
                         <>
-                          <span>Humanize Essay</span>
+                          <span>Rewrite Essay</span>
                           <span>Rewrite</span>
                         </>
                       )}
                     </span>
                     <span className="btn-action-cost">
-                      {isFreePlan ? "Upgrade required" : `~${humanizeCost.toLocaleString()} cr`}
+                      {isFreePlan ? "Upgrade required" : `~${rewriteCost.toLocaleString()} cr`}
                     </span>
                   </button>
                 </div>
@@ -1414,41 +1414,41 @@ export default function App() {
             </section>
           )}
 
-          {humanizeLoading && (
+          {rewriteLoading && (
             <section className="result-card">
-              <div className="humanize-loading">Humanizing your essay...</div>
+              <div className="rewrite-loading">Rewriting your essay...</div>
             </section>
           )}
 
-          {humanizeResult && !humanizeResult.billing_redirect && (
-            <section className="result-card" ref={humanizeResultRef}>
-              <button className="card-toggle-header" onClick={() => setHumanizeOpen(o => !o)}>
+          {rewriteResult && !rewriteResult.billing_redirect && (
+            <section className="result-card" ref={rewriteResultRef}>
+              <button className="card-toggle-header" onClick={() => setRewriteOpen(o => !o)}>
                 <div className="result-header-inner">
                   <div>
-                    <div className="eyebrow">Humanized</div>
-                    <h2>{humanizeResult.summary_of_changes}</h2>
+                    <div className="eyebrow">Rewritten</div>
+                    <h2>{rewriteResult.summary_of_changes}</h2>
                   </div>
                   <div className="card-toggle-right">
-                    <div className="verdict humanized">Rewritten</div>
-                    <span className={`collapsible-arrow${humanizeOpen ? " open" : ""}`}>›</span>
+                    <div className="verdict rewritten">Rewritten</div>
+                    <span className={`collapsible-arrow${rewriteOpen ? " open" : ""}`}>›</span>
                   </div>
                 </div>
               </button>
-              {humanizeOpen && (
+              {rewriteOpen && (
                 <>
-                  <div className="compare-grid humanize-review-grid">
+                  <div className="compare-grid rewrite-review-grid">
                     <div className="essay-evidence-panel">
                       <div className="compare-label">Original</div>
                       <div className="compare-text">
-                        {humanizeChanges.map((change, i) => (
+                        {rewriteChanges.map((change, i) => (
                           <button
                             key={`original-${i}`}
                             ref={(node) => {
-                              humanizeOriginalRefs.current[i] = node;
+                              rewriteOriginalRefs.current[i] = node;
                             }}
                             type="button"
-                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
-                            onClick={() => selectHumanizeChange(i)}
+                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedRewriteChangeIndex ? " active" : ""}`}
+                            onClick={() => selectRewriteChange(i)}
                           >
                             {change.changeType !== "unchanged" && (
                               <span className="change-chip">
@@ -1462,25 +1462,25 @@ export default function App() {
                     </div>
                     <div className="essay-evidence-panel">
                       <div className="compare-panel-header">
-                        <div className="compare-label">Humanized</div>
+                        <div className="compare-label">Rewritten</div>
                         <button
                           type="button"
-                          className="copy-humanized-btn"
-                          onClick={copyHumanizedText}
+                          className="copy-rewritten-btn"
+                          onClick={copyRewrittenText}
                         >
-                          {humanizedCopied ? "Copied" : "Copy"}
+                          {rewrittenCopied ? "Copied" : "Copy"}
                         </button>
                       </div>
                       <div className="compare-text">
-                        {humanizeChanges.map((change, i) => (
+                        {rewriteChanges.map((change, i) => (
                           <button
                             key={`rewritten-${i}`}
                             ref={(node) => {
-                              humanizeRewrittenRefs.current[i] = node;
+                              rewriteRewrittenRefs.current[i] = node;
                             }}
                             type="button"
-                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedHumanizeChangeIndex ? " active" : ""}`}
-                            onClick={() => selectHumanizeChange(i)}
+                            className={`change-block change-${change.changeType}${change.changed ? " changed" : ""}${i === selectedRewriteChangeIndex ? " active" : ""}`}
+                            onClick={() => selectRewriteChange(i)}
                           >
                             {change.changeType !== "unchanged" && (
                               <span className="change-chip">
@@ -1493,22 +1493,22 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  {selectedHumanizeChange && (
+                  {selectedRewriteChange && (
                     <div className="change-reason-panel">
-                      <span className="suggestion-label">What changed:</span> {selectedHumanizeChange.reason}
+                      <span className="suggestion-label">What changed:</span> {selectedRewriteChange.reason}
                     </div>
                   )}
-                  {humanizeResult.key_improvements?.length > 0 && (
+                  {rewriteResult.key_improvements?.length > 0 && (
                     <Collapsible label="Key improvements">
                       <ul className="improvements-list">
-                        {humanizeResult.key_improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                        {rewriteResult.key_improvements.map((imp, i) => <li key={i}>{imp}</li>)}
                       </ul>
                     </Collapsible>
                   )}
                   <div className="credits-footer">
-                    Credits used: <strong>{humanizeResult.credits_charged}</strong>
+                    Credits used: <strong>{rewriteResult.credits_charged}</strong>
                     {" · "}
-                    Remaining: <strong>{humanizeResult.credits_remaining.toLocaleString()}</strong>
+                    Remaining: <strong>{rewriteResult.credits_remaining.toLocaleString()}</strong>
                   </div>
                 </>
               )}
@@ -1529,13 +1529,13 @@ export default function App() {
             </section>
           )}
 
-          {humanizeResult?.billing_redirect && (
+          {rewriteResult?.billing_redirect && (
             <section className="result-card">
               <div className="billing-cta">
-                <strong>{humanizeResult.billing_redirect.message}</strong>
-                <p>{humanizeResult.billing_redirect.recommended_offer}</p>
+                <strong>{rewriteResult.billing_redirect.message}</strong>
+                <p>{rewriteResult.billing_redirect.recommended_offer}</p>
                 <div className="checkout-stack" style={{ marginTop: 16 }}>
-                  {humanizeResult.billing_redirect.checkout_options.slice(0, 3).map((opt) => (
+                  {rewriteResult.billing_redirect.checkout_options.slice(0, 3).map((opt) => (
                     <button key={opt.code} onClick={() => startCheckout(opt.code)}>{opt.label}</button>
                   ))}
                 </div>

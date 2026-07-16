@@ -23,14 +23,14 @@ class Settings(BaseSettings):
     student_plus_monthly_credits: int = 60000
     pro_monthly_credits: int = 150000
 
-    humanize_cost_per_word: int = 5
-    humanize_min_credits: int = 5000
+    rewriter_cost_per_word: int = 5
+    rewriter_min_credits: int = 5000
 
     # Output caps to keep API spend bounded per request
     coach_max_tokens: int = 1800
-    humanize_analysis_max_tokens: int = 700
-    humanize_rewrite_max_tokens: int = 2800
-    humanize_repair_max_tokens: int = 2800
+    rewriter_analysis_max_tokens: int = 700
+    rewriter_rewrite_max_tokens: int = 2800
+    rewriter_repair_max_tokens: int = 2800
 
     # Models
     coach_model: str = "gpt-4o"

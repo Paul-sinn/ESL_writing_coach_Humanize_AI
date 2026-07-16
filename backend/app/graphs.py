@@ -5,10 +5,10 @@ from typing import Any, Literal, TypedDict
 from langgraph.graph import END, StateGraph
 
 from .config import get_settings
-from .schemas import CoachResponse, FeedbackItem, HumanizeResponse
+from .schemas import CoachResponse, FeedbackItem, RewriterResponse
 from .services.billing import billing_service
 from .services.coaching import coaching_service
-from .services.humanize import humanize_service
+from .services.rewriter import rewriter_service
 from .services.rate_limits import rate_limit_service
 from .utils.text import count_words
 
@@ -52,7 +52,7 @@ class CoachState(TypedDict, total=False):
     response: CoachResponse
 
 
-class HumanizeState(TypedDict, total=False):
+class RewriterState(TypedDict, total=False):
     user_id: str
     text: str
     tone: str
@@ -74,7 +74,7 @@ class HumanizeState(TypedDict, total=False):
     key_improvements: list[str]
     billing_redirect: Any
     error: str | None
-    response: HumanizeResponse
+    response: RewriterResponse
 
 
 class BillingState(TypedDict, total=False):
@@ -91,7 +91,7 @@ class BillingState(TypedDict, total=False):
 
 # ── Shared ───────────────────────────────────────────────────────────────────
 
-def load_user_context(state: CoachState | HumanizeState) -> dict[str, Any]:
+def load_user_context(state: CoachState | RewriterState) -> dict[str, Any]:
     status = billing_service.get_status(state["user_id"])
     return {
         "subscription_status": status.subscription_status,
@@ -118,8 +118,8 @@ def calculate_coach_credits(word_count: int, depth: str) -> int:
 
 
 
-def calculate_humanize_credits(word_count: int) -> int:
-    return max(word_count * settings.humanize_cost_per_word, settings.humanize_min_credits)
+def calculate_rewriter_credits(word_count: int) -> int:
+    return max(word_count * settings.rewriter_cost_per_word, settings.rewriter_min_credits)
 
 
 # ── Coach graph nodes ─────────────────────────────────────────────────────────
@@ -269,35 +269,35 @@ def entitlement_should_continue(state: CoachState) -> str:
     return "continue"
 
 
-# ── Humanize graph nodes ──────────────────────────────────────────────────────
+# ── Rewriter graph nodes ──────────────────────────────────────────────────────
 
-def validate_humanize_input(state: HumanizeState) -> dict[str, Any]:
+def validate_rewriter_input(state: RewriterState) -> dict[str, Any]:
     text = state["text"].strip()
     word_count = count_words(text)
     if not text:
-        return {"error": "Please paste your essay before humanizing."}
+        return {"error": "Please paste your essay before rewriting."}
     if word_count > settings.max_word_limit:
         return {"error": f"Text must be {settings.max_word_limit} words or fewer."}
     return {"text": text, "input_word_count": word_count}
 
 
-def resolve_humanize_cost(state: HumanizeState) -> dict[str, Any]:
-    return {"credits_required": calculate_humanize_credits(state["input_word_count"])}
+def resolve_rewriter_cost(state: RewriterState) -> dict[str, Any]:
+    return {"credits_required": calculate_rewriter_credits(state["input_word_count"])}
 
 
-def check_humanize_entitlement(state: HumanizeState) -> dict[str, Any]:
+def check_rewriter_entitlement(state: RewriterState) -> dict[str, Any]:
     if state.get("credits_reserved"):
         return {}
     has_credits, _ = billing_service.ensure_credits(state["user_id"], state["credits_required"])
     if not has_credits:
         return {
-            "billing_redirect": billing_service.build_redirect(state["user_id"], "Humanize"),
+            "billing_redirect": billing_service.build_redirect(state["user_id"], "Rewriter"),
             "error": "INSUFFICIENT_CREDITS",
         }
     return {}
 
 
-def run_humanize_analysis(state: HumanizeState) -> dict[str, Any]:
+def run_rewriter_analysis(state: RewriterState) -> dict[str, Any]:
     coach_feedback = state.get("coach_feedback")
     if coach_feedback:
         patterns = [item["sentence"] for item in coach_feedback
@@ -311,7 +311,7 @@ def run_humanize_analysis(state: HumanizeState) -> dict[str, Any]:
             "rewrite_targets": targets[:5],
             "tone_issues": tone_issues[:3],
         }}
-    result = humanize_service.analyze_for_rewrite(
+    result = rewriter_service.analyze_for_rewrite(
         state["text"],
         state.get("tone", "natural_student"),
         state.get("strength", "balanced"),
@@ -320,8 +320,8 @@ def run_humanize_analysis(state: HumanizeState) -> dict[str, Any]:
     return {"analysis_result": result}
 
 
-def run_humanize_rewrite(state: HumanizeState) -> dict[str, Any]:
-    result = humanize_service.rewrite(
+def run_rewriter_rewrite(state: RewriterState) -> dict[str, Any]:
+    result = rewriter_service.rewrite(
         state["text"],
         tone=state.get("tone", "natural_student"),
         strength=state.get("strength", "balanced"),
@@ -341,25 +341,25 @@ def run_humanize_rewrite(state: HumanizeState) -> dict[str, Any]:
     }
 
 
-def deduct_humanize_credits(state: HumanizeState) -> dict[str, Any]:
+def deduct_rewriter_credits(state: RewriterState) -> dict[str, Any]:
     if state.get("credits_reserved"):
         return {}
     account = billing_service.deduct_credits(state["user_id"], state["credits_required"])
     return {"credits_remaining": account.credits_remaining}
 
 
-def route_to_billing_humanize(state: HumanizeState) -> dict[str, Any]:
+def route_to_billing_rewriter(state: RewriterState) -> dict[str, Any]:
     return {}
 
 
-def format_humanize_response(state: HumanizeState) -> dict[str, Any]:
+def format_rewriter_response(state: RewriterState) -> dict[str, Any]:
     error = state.get("error")
     if error and error != "INSUFFICIENT_CREDITS":
         raise ValueError(error)
 
-    response = HumanizeResponse(
+    response = RewriterResponse(
         rewritten_text=state.get("rewritten_text", ""),
-        summary_of_changes=state.get("summary_of_changes", "Add credits to unlock Humanize."),
+        summary_of_changes=state.get("summary_of_changes", "Add credits to unlock Rewriter."),
         key_improvements=state.get("key_improvements", []),
         credits_charged=0 if state.get("billing_redirect") else state.get("credits_required", 0),
         credits_remaining=state.get("credits_remaining", 0),
@@ -370,11 +370,11 @@ def format_humanize_response(state: HumanizeState) -> dict[str, Any]:
     return {"response": response}
 
 
-def humanize_validation_should_continue(state: HumanizeState) -> str:
+def rewriter_validation_should_continue(state: RewriterState) -> str:
     return "error" if state.get("error") else "continue"
 
 
-def humanize_entitlement_should_continue(state: HumanizeState) -> str:
+def rewriter_entitlement_should_continue(state: RewriterState) -> str:
     if state.get("error") == "INSUFFICIENT_CREDITS":
         return "billing"
     if state.get("error"):
@@ -444,36 +444,36 @@ def build_coach_graph():
     return graph.compile()
 
 
-def build_humanize_graph():
-    graph = StateGraph(HumanizeState)
+def build_rewriter_graph():
+    graph = StateGraph(RewriterState)
     graph.add_node("load_user_context", load_user_context)
-    graph.add_node("validate_humanize_input", validate_humanize_input)
-    graph.add_node("resolve_humanize_cost", resolve_humanize_cost)
-    graph.add_node("check_humanize_entitlement", check_humanize_entitlement)
-    graph.add_node("run_humanize_analysis", run_humanize_analysis)
-    graph.add_node("run_humanize_rewrite", run_humanize_rewrite)
-    graph.add_node("deduct_humanize_credits", deduct_humanize_credits)
-    graph.add_node("route_to_billing_humanize", route_to_billing_humanize)
-    graph.add_node("format_humanize_response", format_humanize_response)
+    graph.add_node("validate_rewriter_input", validate_rewriter_input)
+    graph.add_node("resolve_rewriter_cost", resolve_rewriter_cost)
+    graph.add_node("check_rewriter_entitlement", check_rewriter_entitlement)
+    graph.add_node("run_rewriter_analysis", run_rewriter_analysis)
+    graph.add_node("run_rewriter_rewrite", run_rewriter_rewrite)
+    graph.add_node("deduct_rewriter_credits", deduct_rewriter_credits)
+    graph.add_node("route_to_billing_rewriter", route_to_billing_rewriter)
+    graph.add_node("format_rewriter_response", format_rewriter_response)
 
     graph.set_entry_point("load_user_context")
-    graph.add_edge("load_user_context", "validate_humanize_input")
+    graph.add_edge("load_user_context", "validate_rewriter_input")
     graph.add_conditional_edges(
-        "validate_humanize_input",
-        humanize_validation_should_continue,
-        {"continue": "resolve_humanize_cost", "error": "format_humanize_response"},
+        "validate_rewriter_input",
+        rewriter_validation_should_continue,
+        {"continue": "resolve_rewriter_cost", "error": "format_rewriter_response"},
     )
-    graph.add_edge("resolve_humanize_cost", "check_humanize_entitlement")
+    graph.add_edge("resolve_rewriter_cost", "check_rewriter_entitlement")
     graph.add_conditional_edges(
-        "check_humanize_entitlement",
-        humanize_entitlement_should_continue,
-        {"continue": "run_humanize_analysis", "billing": "route_to_billing_humanize", "error": "format_humanize_response"},
+        "check_rewriter_entitlement",
+        rewriter_entitlement_should_continue,
+        {"continue": "run_rewriter_analysis", "billing": "route_to_billing_rewriter", "error": "format_rewriter_response"},
     )
-    graph.add_edge("run_humanize_analysis", "run_humanize_rewrite")
-    graph.add_edge("run_humanize_rewrite", "deduct_humanize_credits")
-    graph.add_edge("deduct_humanize_credits", "format_humanize_response")
-    graph.add_edge("route_to_billing_humanize", "format_humanize_response")
-    graph.add_edge("format_humanize_response", END)
+    graph.add_edge("run_rewriter_analysis", "run_rewriter_rewrite")
+    graph.add_edge("run_rewriter_rewrite", "deduct_rewriter_credits")
+    graph.add_edge("deduct_rewriter_credits", "format_rewriter_response")
+    graph.add_edge("route_to_billing_rewriter", "format_rewriter_response")
+    graph.add_edge("format_rewriter_response", END)
     return graph.compile()
 
 
@@ -492,5 +492,5 @@ def build_billing_graph():
 
 
 coach_graph = build_coach_graph()
-humanize_graph = build_humanize_graph()
+rewriter_graph = build_rewriter_graph()
 billing_graph = build_billing_graph()

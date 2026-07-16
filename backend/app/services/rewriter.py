@@ -90,7 +90,7 @@ def _language_instruction(text: str) -> str:
     )
 
 
-class HumanizeModelService:
+class RewriterModelService:
     def __init__(self) -> None:
         self._client = OpenAI(api_key=settings.openai_api_key) if (settings.openai_api_key and OpenAI) else None
 
@@ -121,7 +121,7 @@ class HumanizeModelService:
                     {"role": "user", "content": text},
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=settings.humanize_analysis_max_tokens,
+                max_tokens=settings.rewriter_analysis_max_tokens,
             )
             return json.loads(response.choices[0].message.content or "{}")
         except Exception:
@@ -226,7 +226,7 @@ class HumanizeModelService:
                     {"role": "user", "content": f"Rewrite this essay:\n\n{text}"},
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=settings.humanize_rewrite_max_tokens,
+                max_tokens=settings.rewriter_rewrite_max_tokens,
             )
             content = response.choices[0].message.content or ""
             result = json.loads(content)
@@ -280,7 +280,7 @@ class HumanizeModelService:
                     },
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=settings.humanize_repair_max_tokens,
+                max_tokens=settings.rewriter_repair_max_tokens,
             )
             repaired = json.loads(response.choices[0].message.content or "{}")
         except Exception:
@@ -323,4 +323,4 @@ class HumanizeModelService:
         }
 
 
-humanize_service = HumanizeModelService()
+rewriter_service = RewriterModelService()

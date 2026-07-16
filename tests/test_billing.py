@@ -161,7 +161,7 @@ def test_create_checkout_url_calls_polar(monkeypatch, service):
 
     assert url == "https://polar.sh/checkout/test"
     assert captured["url"] == "https://api.polar.sh/v1/checkouts/"
-    assert captured["headers"]["User-Agent"] == "pj-1-humanize-app/0.1 server-checkout"
+    assert captured["headers"]["User-Agent"] == "pj-1-rewriter-app/0.1 server-checkout"
     assert captured["body"] == {
         "products": ["product-plus"],
         "success_url": "http://localhost:5173/?payment_success=1",
@@ -220,7 +220,7 @@ def test_create_customer_portal_url_calls_polar(monkeypatch, service):
         "external_customer_id": "00000000-0000-0000-0000-000000000001",
         "return_url": "https://app.example.test/billing",
     }
-    assert captured["headers"]["User-Agent"] == "pj-1-humanize-app/0.1 customer-portal"
+    assert captured["headers"]["User-Agent"] == "pj-1-rewriter-app/0.1 customer-portal"
 
 
 def test_create_checkout_url_omits_reserved_demo_email(monkeypatch, service):

@@ -1,8 +1,8 @@
 import pytest
-from backend.app.graphs import billing_graph, coach_graph, humanize_graph
+from backend.app.graphs import billing_graph, coach_graph, rewriter_graph
 from backend.app.services.billing import billing_service
 from backend.app.services.coaching import coaching_service
-from backend.app.services.humanize import humanize_service
+from backend.app.services.rewriter import rewriter_service
 
 _TEXT = "This is a short essay. It sounds polished. Furthermore, it repeats transitions."
 _LONG_TEXT = " ".join(["word"] * 310)
@@ -149,10 +149,10 @@ def test_coach_graph_deducts_credits_for_paid_user():
     assert billing_service._accounts["demo-plus"].credits_remaining == initial - response.credits_charged
 
 
-# --- humanize_graph ---
+# --- rewriter_graph ---
 
-def test_humanize_graph_rewrites_text():
-    result = humanize_graph.invoke({
+def test_rewriter_graph_rewrites_text():
+    result = rewriter_graph.invoke({
         "user_id": "demo-pro",
         "text": _TEXT,
         "tone": "natural_student",
@@ -168,10 +168,10 @@ def test_humanize_graph_rewrites_text():
     assert response.billing_redirect is None
 
 
-def test_humanize_graph_deducts_credits():
+def test_rewriter_graph_deducts_credits():
     billing_service._accounts["demo-plus"].credits_remaining = 60000
     initial = billing_service._accounts["demo-plus"].credits_remaining
-    result = humanize_graph.invoke({
+    result = rewriter_graph.invoke({
         "user_id": "demo-plus",
         "text": _TEXT,
         "tone": "natural_student",
@@ -186,15 +186,15 @@ def test_humanize_graph_deducts_credits():
     assert billing_service._accounts["demo-plus"].credits_remaining == initial - response.credits_charged
 
 
-def test_humanize_graph_reuses_coach_feedback_without_analysis_call(monkeypatch):
+def test_rewriter_graph_reuses_coach_feedback_without_analysis_call(monkeypatch):
     billing_service._accounts["demo-plus"].credits_remaining = 60000
 
     def fail_if_called(*args, **kwargs):
         raise AssertionError("analyze_for_rewrite should not run when coach_feedback is provided")
 
-    monkeypatch.setattr(humanize_service, "analyze_for_rewrite", fail_if_called)
+    monkeypatch.setattr(rewriter_service, "analyze_for_rewrite", fail_if_called)
 
-    result = humanize_graph.invoke({
+    result = rewriter_graph.invoke({
         "user_id": "demo-plus",
         "text": _TEXT,
         "tone": "natural_student",
@@ -217,8 +217,8 @@ def test_humanize_graph_reuses_coach_feedback_without_analysis_call(monkeypatch)
     assert response.credits_charged == 5000
 
 
-def test_humanize_graph_insufficient_credits():
-    result = humanize_graph.invoke({
+def test_rewriter_graph_insufficient_credits():
+    result = rewriter_graph.invoke({
         "user_id": "demo-free",
         "text": _TEXT,
         "tone": "natural_student",

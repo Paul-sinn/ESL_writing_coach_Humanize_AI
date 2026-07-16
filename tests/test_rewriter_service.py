@@ -1,6 +1,6 @@
 import json
 
-from backend.app.services.humanize import HumanizeModelService
+from backend.app.services.rewriter import RewriterModelService
 
 
 class _Message:
@@ -41,8 +41,8 @@ class _FakeClient:
         self.chat = _FakeChat(self.completions)
 
 
-def _service_with_payloads(payloads: list[dict]) -> tuple[HumanizeModelService, _FakeClient]:
-    service = HumanizeModelService()
+def _service_with_payloads(payloads: list[dict]) -> tuple[RewriterModelService, _FakeClient]:
+    service = RewriterModelService()
     client = _FakeClient(payloads)
     service._client = client
     return service, client
@@ -238,7 +238,7 @@ def test_rewrite_prompt_allows_very_limited_em_dashes_for_native_persona():
 
 
 def test_fallback_rewrite_korean_input_keeps_metadata_in_english():
-    service = HumanizeModelService()
+    service = RewriterModelService()
     service._client = None
 
     result = service.rewrite(

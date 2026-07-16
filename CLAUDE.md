@@ -144,11 +144,11 @@ Settings loaded from `.env` via `backend/app/config.py` (Pydantic Settings, `lru
 | `OPENAI_API_KEY` | `None` | LLM calls — all services fall back to heuristics if unset |
 | `standard_analysis_model` | `gpt-4` | Basic analysis model |
 | `advanced_analysis_model` | `gpt-5` | Advanced analysis model |
-| `humanize_model` | `gpt-5` | Humanize rewrite model |
+| `rewriter_model` | `gpt-5` | Rewriter rewrite model |
 | `max_word_limit` | `1200` | Input word cap (validated in schemas + graph) |
 | `pro_monthly_credits` | `1000` | Credits seeded to demo-pro account |
 | `advanced_credit_cost` | `50` | Credits per advanced scan |
-| `humanize_credit_cost` | `250` | Credits per humanize |
+| `rewriter_credit_cost` | `250` | Credits per rewriter |
 
 Frontend: `VITE_API_BASE` overrides default `http://127.0.0.1:8000`.
 

@@ -123,7 +123,7 @@ export default function LandingPage({ onStart, onUpgrade }) {
           {[
             "AI pattern detection",
             "Personal voice coaching",
-            "Humanize rewrite engine",
+            "AI rewrite engine",
           ].map((f) => (
             <div key={f} className="landing-feature">
               <span className="landing-feature-dot" />
